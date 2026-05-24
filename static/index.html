@@ -944,6 +944,7 @@ function renderRecordings(){
 }
 
 function rowMenu(ev,id){
+  ev.stopPropagation();
   const btn = ev.currentTarget;
   const cell = btn.parentElement;
   const wasOpen = cell.classList.contains('open');
@@ -953,6 +954,8 @@ function rowMenu(ev,id){
   if(!rec) return;
   const rect = btn.getBoundingClientRect();
   cell.classList.add('open');
+  // Любой клик внутри ячейки меню не должен открывать запись
+  cell.onclick = e => e.stopPropagation();
   const projItems = [
     {name:null,label:'Без проекта'},
     ...PROJECTS.map(p=>({name:p.name,label:p.name})),
