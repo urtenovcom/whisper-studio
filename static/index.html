@@ -1,0 +1,1570 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Whisper Studio</title>
+<style>
+  :root{
+    --accent:#6366f1; --accent-dark:#4f46e5; --accent-soft:#eef2ff;
+    --bg:#f5f6fa; --panel:#ffffff; --text:#1f2430; --muted:#7a8294;
+    --border:#e6e8ef; --sidebar:#1c2030; --sidebar-text:#c7cbd9;
+    --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --row:#fafbfd;
+    --scroll-thumb:#c8ccd6; --scroll-thumb-hover:#a8acba;
+    --radius:14px; --shadow:0 1px 3px rgba(20,24,40,.06),0 8px 24px rgba(20,24,40,.06);
+  }
+  html[data-theme="dark"]{
+    --bg:#13151c; --panel:#1c1f2a; --text:#e7e9f0; --muted:#8b91a3;
+    --border:#2a2e3c; --sidebar:#15171f; --sidebar-text:#aeb3c4;
+    --accent-soft:#262a44; --row:#20232f;
+    --scroll-thumb:#2e3242; --scroll-thumb-hover:#3e4358;
+    --shadow:0 1px 3px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.35);
+  }
+  /* ---------- Скроллбар в стиле приложения ---------- */
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{
+    background:var(--scroll-thumb);
+    border-radius:8px;
+    border:2px solid transparent;
+    background-clip:content-box;
+    min-height:36px;min-width:36px;
+  }
+  ::-webkit-scrollbar-thumb:hover{
+    background:var(--scroll-thumb-hover);
+    background-clip:content-box;
+  }
+  ::-webkit-scrollbar-corner{background:transparent}
+  /* В тёмном сайдбаре — слегка светлее тумб для контраста */
+  .sidebar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.10);background-clip:content-box}
+  .sidebar::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.18);background-clip:content-box}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:"Segoe UI",Roboto,system-ui,sans-serif;
+    background:var(--bg);color:var(--text);
+    display:flex;min-height:100vh;font-size:14px;
+  }
+  /* ---------- Sidebar ---------- */
+  .sidebar{
+    width:240px;background:var(--sidebar);color:var(--sidebar-text);
+    display:flex;flex-direction:column;padding:18px 14px;flex-shrink:0;
+  }
+  .brand{display:flex;align-items:center;gap:10px;padding:6px 8px 18px}
+  .brand .logo{
+    width:38px;height:38px;border-radius:11px;background:var(--accent);
+    display:flex;align-items:center;justify-content:center;font-size:20px;
+  }
+  .brand b{color:#fff;font-size:16px;display:block}
+  .brand span{font-size:11px;color:#7e8499}
+  .nav-item{
+    display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:10px;
+    cursor:pointer;color:var(--sidebar-text);font-weight:500;margin-bottom:3px;
+    transition:background .15s;
+  }
+  .nav-item:hover{background:rgba(255,255,255,.06)}
+  .nav-item.active{background:rgba(99,102,241,.18);color:#c7d2fe;box-shadow:inset 2px 0 0 var(--accent)}
+  .nav-item.active .ico{color:#a5b4fc}
+  .nav-item.active .count{background:rgba(99,102,241,.28);color:#c7d2fe}
+  .nav-item.new-item,.nav-item.new-item.active{background:var(--accent);color:#fff;box-shadow:0 2px 8px rgba(99,102,241,.25);margin-bottom:14px}
+  .nav-item.new-item:hover{background:var(--accent-dark)}
+  .nav-item.new-item.active .ico,.nav-item.new-item .ico{color:#fff}
+  .nav-item .ico{width:18px;text-align:center;display:inline-flex;align-items:center;justify-content:center}
+  .brand .logo{color:#fff}
+  .i{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0;vertical-align:middle}
+  .i.lg{width:34px;height:34px}
+  .i.xl{width:22px;height:22px}
+  .i.sm{width:14px;height:14px}
+  .btn .i{margin:0}
+  .rec-meta .i{margin-right:4px;width:13px;height:13px;opacity:.75}
+  .rec-meta span{display:inline-flex;align-items:center;gap:3px}
+  .nav-section{font-size:11px;color:#7e8499;text-transform:uppercase;letter-spacing:.05em;padding:14px 12px 6px;font-weight:600}
+  .nav-item .count{margin-left:auto;font-size:11px;color:#7e8499;background:rgba(255,255,255,.06);padding:1px 7px;border-radius:10px;min-width:18px;text-align:center}
+  body.no-counts .nav-item .count{display:none}
+  .nav-item.active .count{background:rgba(255,255,255,.18);color:#fff}
+  .nav-item.add-proj{color:#7e8499;font-weight:400;font-size:13px}
+  .nav-item.add-proj:hover{color:var(--sidebar-text)}
+  .nav-item.proj{position:relative}
+  .nav-item.proj .count{transition:opacity .12s}
+  .nav-item.proj .proj-menu-btn{position:absolute;right:10px;top:50%;transform:translateY(-50%);width:24px;height:24px;border-radius:6px;background:transparent;border:none;color:inherit;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .12s,background .12s}
+  .nav-item.proj .proj-menu-btn:hover{background:rgba(255,255,255,.08)}
+  .nav-item.proj:hover .proj-menu-btn,.nav-item.proj.open .proj-menu-btn{opacity:1;pointer-events:auto}
+  .nav-item.proj:hover .count,.nav-item.proj.open .count{opacity:0}
+  .rec-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:20px}
+  .rec-head h1{margin:0;line-height:1.2}
+  .rec-head .btn{flex-shrink:0}
+  .rec-search{margin-bottom:16px}
+  .rec-search input{width:100%;max-width:380px;padding:10px 14px;border:1px solid var(--border);border-radius:10px;background:var(--panel);color:var(--text);font-size:14px;outline:none}
+  .rec-search input:focus{border-color:var(--accent)}
+  .rec-table{width:100%;border-collapse:separate;border-spacing:0;background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden}
+  .rec-table th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:12px 12px;border-bottom:1px solid var(--border);background:var(--row);white-space:nowrap}
+  .rec-table td{padding:12px 12px;border-bottom:1px solid var(--border);font-size:13.5px;vertical-align:middle}
+  .rec-table tbody tr:last-child td{border-bottom:none}
+  .rec-table tbody tr{cursor:pointer;transition:background .12s}
+  .rec-table tbody tr:hover td{background:var(--row)}
+  .rec-table .name-cell{display:flex;align-items:center;gap:10px}
+  .rec-table .name-cell .file-ico{flex-shrink:0;color:var(--accent);width:26px;height:26px;border-radius:7px;background:var(--accent-soft);display:inline-flex;align-items:center;justify-content:center}
+  .badges{display:flex;gap:5px;flex-wrap:wrap}
+  .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:500;white-space:nowrap}
+  .badge.gray{background:var(--row);color:var(--muted)}
+  .status-done{display:inline-flex;align-items:center;gap:5px;padding:3px 9px;border-radius:6px;background:rgba(16,185,129,.12);color:var(--ok);font-size:12px;font-weight:500}
+  .row-actions{position:relative;text-align:right}
+  .row-actions .dots{padding:6px 10px;border-radius:6px;background:transparent;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1}
+  .row-actions .dots:hover{background:var(--row);color:var(--text)}
+  .row-actions .menu,.proj-menu{position:fixed;background:var(--panel);border:1px solid var(--border);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);min-width:200px;z-index:1000;padding:5px;display:none;text-align:left;color:var(--text)}
+  .row-actions .menu{min-width:230px}
+  .row-actions.open .menu{display:block}
+  .row-actions .menu .item,.proj-menu .item{padding:8px 12px;border-radius:6px;cursor:pointer;font-size:13px;display:flex;align-items:center;gap:8px;color:var(--text)}
+  .row-actions .menu .item:hover,.proj-menu .item:hover{background:var(--row)}
+  .row-actions .menu .item.danger,.proj-menu .item.danger{color:var(--err)}
+  .row-actions .menu .item.checked::before{content:"✓";margin-right:4px;color:var(--accent);font-weight:700}
+  .row-actions .menu .section{font-size:11px;color:var(--muted);padding:8px 12px 4px;text-transform:uppercase;letter-spacing:.04em}
+  .row-actions .menu hr{border:none;border-top:1px solid var(--border);margin:4px 0}
+  .empty-row td{padding:30px;text-align:center;color:var(--muted)}
+  .pending-files{display:flex;flex-direction:column;gap:8px;margin-bottom:18px}
+  .pending-file{display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid var(--border);border-radius:10px;background:var(--row)}
+  .pending-file svg{color:var(--accent);flex-shrink:0}
+  .pending-file .pf-name{flex:1;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pending-file .pf-size{font-size:12px;color:var(--muted);flex-shrink:0}
+  .pending-file .pf-x{margin-left:4px}
+  .pending-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;padding-top:16px;border-top:1px solid var(--border)}
+  .modal-backdrop{position:fixed;inset:0;background:rgba(15,17,25,.55);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:2000;opacity:0;transition:opacity .15s}
+  .modal-backdrop.show{display:flex;opacity:1}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 24px 60px rgba(0,0,0,.35);width:100%;max-width:440px;margin:20px;transform:scale(.96);transition:transform .18s cubic-bezier(.2,.9,.3,1.2);overflow:hidden}
+  .modal-backdrop.show .modal{transform:scale(1)}
+  .modal-head{display:flex;align-items:center;padding:18px 22px 6px;gap:12px}
+  .modal-head h3{margin:0;flex:1;font-size:17px;font-weight:600;color:var(--text)}
+  .modal-x{width:30px;height:30px;border-radius:7px;background:transparent;border:none;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:background .12s,color .12s}
+  .modal-x:hover{background:var(--row);color:var(--text)}
+  .modal-body{padding:8px 22px 18px;color:var(--text)}
+  .modal-body label{display:block;font-size:12px;color:var(--muted);font-weight:600;margin-bottom:6px}
+  .modal-body input[type=text]{width:100%;padding:11px 14px;border:1.5px solid var(--border);border-radius:10px;background:var(--bg);color:var(--text);font-size:14px;outline:none;transition:border-color .12s}
+  .modal-body input[type=text]:focus{border-color:var(--accent)}
+  .modal-body p{margin:0;line-height:1.5;color:var(--text)}
+  .modal-body .hint-small{font-size:12px;color:var(--muted);margin-top:8px}
+  .modal-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px 18px;border-top:1px solid var(--border);background:var(--row)}
+  .modal-foot .btn.danger{background:var(--err);color:#fff;border-color:transparent}
+  .modal-foot .btn.danger:hover{background:var(--err);color:#fff;opacity:.9}
+  .pick-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
+  .pick-chip{padding:9px 14px;border-radius:8px;background:var(--bg);border:1.5px solid var(--border);color:var(--text);cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;transition:.12s}
+  .pick-chip:hover{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .seg-toggle{display:inline-flex;background:var(--row);border:1px solid var(--border);border-radius:9px;padding:3px;gap:2px}
+  .seg-toggle button{padding:6px 14px;border:none;background:transparent;color:var(--muted);font-family:inherit;font-size:12px;font-weight:600;border-radius:6px;cursor:pointer;transition:.12s}
+  .seg-toggle button:hover{color:var(--text)}
+  .seg-toggle button.active{background:var(--panel);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+  .sidebar .spacer{flex:1}
+  .device-badge{
+    font-size:11px;color:#7e8499;padding:10px 12px;border-top:1px solid #2a2e3c;
+  }
+  .device-badge .brand-by b{color:#c7cbd9;font-weight:600}
+  .device-badge .brand-ver{display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:10.5px;opacity:.75}
+  .device-badge .brand-ver a{color:var(--accent);text-decoration:none;font-weight:600}
+  .device-badge .brand-ver a:hover{text-decoration:underline}
+  /* ---------- Main ---------- */
+  .main{flex:1;padding:32px 40px;overflow-y:auto;max-height:100vh}
+  .view{display:none;max-width:920px;margin:0 auto}
+  .view.active{display:block}
+  h1{font-size:22px;margin-bottom:4px}
+  .sub{color:var(--muted);margin-bottom:24px}
+  .panel{
+    background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+    padding:22px;box-shadow:var(--shadow);margin-bottom:20px;
+  }
+  /* ---------- Upload ---------- */
+  .drop{
+    border:2px dashed var(--border);border-radius:12px;padding:38px 20px;
+    text-align:center;cursor:pointer;transition:.15s;
+  }
+  .drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+  .drop .big{font-size:34px;margin-bottom:8px}
+  .drop b{font-size:15px}
+  .drop p{color:var(--muted);font-size:12px;margin-top:4px}
+  .upload-row{display:flex;gap:10px;margin-top:14px}
+  .opts{display:flex;gap:14px;flex-wrap:wrap;margin:18px 0 6px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:12px;color:var(--muted);font-weight:600}
+  select,input[type=text]{
+    background:var(--panel);color:var(--text);border:1px solid var(--border);
+    border-radius:9px;padding:9px 11px;font-size:13px;font-family:inherit;min-width:150px;
+  }
+  .toggle{display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;padding-bottom:9px}
+  .switch{
+    width:38px;height:22px;background:var(--border);border-radius:20px;position:relative;
+    transition:.15s;flex-shrink:0;
+  }
+  .switch.on{background:var(--accent)}
+  .switch::after{
+    content:"";position:absolute;width:18px;height:18px;border-radius:50%;
+    background:#fff;top:2px;left:2px;transition:.15s;
+  }
+  .switch.on::after{left:18px}
+  /* ---------- Buttons ---------- */
+  .btn{
+    border:none;border-radius:9px;padding:10px 16px;font-size:13px;font-weight:600;
+    cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:7px;
+    transition:.12s;
+  }
+  .btn.primary{background:var(--accent);color:#fff}
+  .btn.primary:hover{background:var(--accent-dark)}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+  .btn.ghost:hover{background:var(--row)}
+  .btn.danger{background:transparent;color:var(--err);border:1px solid var(--border)}
+  .btn.danger:hover{background:#fef2f2}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .btn.sm{padding:7px 11px;font-size:12px}
+  /* ---------- Queue ---------- */
+  .qitem{
+    display:flex;align-items:center;gap:12px;padding:13px;border:1px solid var(--border);
+    border-radius:11px;margin-top:10px;background:var(--row);
+  }
+  .qitem .name{flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .qitem .meta{font-size:12px;color:var(--muted)}
+  .bar{height:6px;background:var(--border);border-radius:6px;overflow:hidden;width:140px}
+  .bar > div{height:100%;background:var(--accent);width:0;transition:width .3s}
+  .pill{font-size:11px;font-weight:600;padding:3px 9px;border-radius:20px}
+  .pill.ok{background:#dcfce7;color:#15803d}
+  .pill.run{background:#e0e7ff;color:#4338ca}
+  .pill.err{background:#fee2e2;color:#b91c1c}
+  /* ---------- Recordings ---------- */
+  .rec-card{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:16px 18px;margin-bottom:12px;cursor:pointer;transition:.12s;box-shadow:var(--shadow);
+  }
+  .rec-card:hover{border-color:var(--accent);transform:translateY(-1px)}
+  .rec-card h3{font-size:15px;margin-bottom:5px}
+  .rec-card .info{font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap}
+  .rec-card .prev{
+    font-size:13px;color:var(--muted);margin-top:8px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  }
+  .empty{text-align:center;color:var(--muted);padding:50px 20px}
+  .empty .big{font-size:40px;margin-bottom:10px;opacity:.6}
+  /* ---------- Transcript ---------- */
+  .back-btn{padding:8px 14px;font-size:13px;margin-bottom:18px}
+  .new-btn{padding:9px 16px;font-size:13px;border-radius:10px;box-shadow:0 2px 8px rgba(99,102,241,.25)}
+  .new-btn .i{width:15px;height:15px;stroke-width:2.2}
+  .t-head{display:flex;align-items:center;gap:12px;margin-bottom:6px}
+  .t-head h1{flex:1;margin:0;display:inline-flex;align-items:center;gap:8px}
+  .t-head .name-edit{flex:1;display:flex;align-items:center;gap:8px}
+  .t-head .name-edit input{flex:1;font-size:24px;font-weight:700;padding:6px 10px;border-radius:8px;border:1.5px solid var(--accent);background:var(--bg);color:var(--text);outline:none}
+  .icon-btn{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;background:transparent;border:none;cursor:pointer;color:var(--muted);transition:background .15s,color .15s}
+  .icon-btn:hover{background:rgba(127,127,127,.12);color:var(--text)}
+  .icon-btn.primary{background:var(--accent);color:#fff}
+  .icon-btn.primary:hover{background:var(--accent);opacity:.9;color:#fff}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0 18px;align-items:center}
+  .seg{
+    display:flex;gap:14px;padding:11px 12px;border-radius:10px;align-items:baseline
+  }
+  .seg:hover{background:var(--row)}
+  .seg .seg-save,.seg .seg-bm{align-self:center}
+  .seg .ts{
+    font-size:12px;color:var(--accent);font-variant-numeric:tabular-nums;
+    cursor:pointer;white-space:nowrap;font-weight:600;line-height:1.55;
+  }
+  .seg .spk{
+    font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;line-height:1.55;
+    min-width:80px;display:inline-block;color:var(--text);
+    padding:0 6px;border-radius:6px;transition:background .12s,color .12s
+  }
+  .seg .spk::after{content:"";display:inline-block;vertical-align:middle;margin-left:5px;width:0;height:0;border-left:3.5px solid transparent;border-right:3.5px solid transparent;border-top:4px solid currentColor;opacity:.55}
+  .seg .spk:hover,.seg .spk.open{background:var(--row);color:var(--accent)}
+  .seg .txt{flex:1;line-height:1.55;outline:none;border-radius:5px;padding:2px 6px}
+  .seg .txt:focus{background:var(--accent-soft);box-shadow:0 0 0 2px var(--accent)}
+  .seg .seg-save{opacity:0;pointer-events:none;transition:opacity .15s}
+  .seg.editing .seg-save{opacity:1;pointer-events:auto}
+  .speakers-panel{background:var(--accent-soft);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:12px;display:none}
+  .speakers-panel.has-content{display:block}
+  .speakers-panel .sp-head{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--accent);margin-bottom:10px}
+  .speakers-panel .sp-chips{display:flex;flex-wrap:wrap;gap:8px}
+  .sp-chip{display:inline-flex;align-items:center;gap:8px;padding:7px 10px 7px 12px;background:var(--panel);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;color:var(--accent);transition:.12s}
+  .sp-chip:hover{background:var(--row);box-shadow:0 0 0 2px var(--accent-soft)}
+  .sp-chip.hidden{opacity:.45}
+  .sp-chip .sp-name{outline:none}
+  .sp-chip .sp-act{width:22px;height:22px;border-radius:5px;background:transparent;border:none;color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+  .sp-chip .sp-act:hover{background:var(--row);color:var(--accent)}
+  .sp-chip.hidden .sp-act.eye .i{stroke:var(--muted)}
+  .seg .seg-bm{opacity:0;color:var(--muted);transition:opacity .15s,color .15s;flex-shrink:0}
+  .seg:hover .seg-bm{opacity:.5}
+  .seg .seg-bm:hover{opacity:1;color:#eab308}
+  .seg.bookmarked .seg-bm{opacity:1;color:#eab308}
+  .seg.bookmarked .seg-bm .i{fill:#eab308;stroke:#eab308}
+  .search-box{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg)}
+  .search-box svg{color:var(--muted)}
+  .search-box input{border:none;background:transparent;outline:none;color:var(--text);font-size:13px;width:200px}
+  audio{width:100%;margin-bottom:8px;border-radius:10px}
+  audio::-webkit-media-controls-enclosure{border-radius:10px}
+  audio::-webkit-media-controls-panel{border-radius:10px}
+  .dropdown{position:relative;display:inline-block}
+  .dropdown .menu{
+    position:absolute;top:108%;left:0;background:var(--panel);border:1px solid var(--border);
+    border-radius:10px;box-shadow:var(--shadow);padding:5px;display:none;z-index:10;min-width:140px;
+  }
+  .dropdown.open .menu{display:block}
+  .dropdown .menu div{padding:8px 12px;border-radius:7px;cursor:pointer;font-size:13px}
+  .dropdown .menu div:hover{background:var(--row)}
+  .hint{
+    font-size:12px;color:var(--muted);background:var(--accent-soft);
+    border-radius:9px;padding:10px 13px;margin-top:12px;
+  }
+  .toast{
+    position:fixed;bottom:24px;left:50%;transform:translateX(-50%);
+    background:var(--sidebar);color:#fff;padding:11px 20px;border-radius:10px;
+    font-size:13px;opacity:0;transition:.2s;pointer-events:none;z-index:99;
+  }
+  .toast.show{opacity:1}
+  .row-between{display:flex;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+  <symbol id="i-mic" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></symbol>
+  <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></symbol>
+  <symbol id="i-record" viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><path d="M17 21v-8H7v8M7 3v5h8"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></symbol>
+  <symbol id="i-calendar" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M20 9h2M20 15h2M2 9h2M2 15h2"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M12 19l-7-7 7-7"/></symbol>
+  <symbol id="i-chevron-down" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></symbol>
+  <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></symbol>
+  <symbol id="i-eye" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-eye-off" viewBox="0 0 24 24"><path d="M17.94 17.94A10.94 10.94 0 0 1 12 20c-7 0-11-8-11-8a19.78 19.78 0 0 1 5.06-6.06M9.9 4.24A10.94 10.94 0 0 1 12 4c7 0 11 8 11 8a19.86 19.86 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><path d="M1 1l22 22"/></symbol>
+</defs></svg>
+
+<div class="sidebar">
+  <div class="brand">
+    <div class="logo"><svg class="i xl"><use href="#i-mic"/></svg></div>
+    <div><b>Whisper Studio</b><span>локально · faster-whisper</span></div>
+  </div>
+  <div class="nav-item new-item" data-view="new"><span class="ico"><svg class="i"><use href="#i-plus"/></svg></span> Новая транскрипция</div>
+  <div class="nav-item" data-view="recordings" data-filter="all"><span class="ico"><svg class="i"><use href="#i-folder"/></svg></span> Все записи <span class="count" id="cntAll"></span></div>
+  <div class="nav-section">Проекты</div>
+  <div id="projectList"></div>
+  <div class="nav-item add-proj" onclick="createProjectPrompt()"><span class="ico"><svg class="i"><use href="#i-plus"/></svg></span> Создать проект</div>
+  <div class="nav-item" data-view="settings"><span class="ico"><svg class="i"><use href="#i-settings"/></svg></span> Настройки</div>
+  <div class="spacer"></div>
+  <div class="device-badge" id="deviceBadge">
+    <div class="brand-by">Powered by <b>Alazar Studio</b></div>
+    <div class="brand-ver"><span id="appVer">v1.0</span><a href="#" id="updateBtn" style="display:none">Обновить</a></div>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- ========== NEW ========== -->
+  <div class="view active" id="view-new">
+    <h1>Новая транскрипция</h1>
+    <div class="sub">Загрузите аудио или видео — распознавание идёт на вашем компьютере.</div>
+
+    <div class="panel">
+      <div class="drop" id="drop">
+        <div class="big"><svg class="i lg"><use href="#i-upload"/></svg></div>
+        <b>Перетащите файлы или нажмите для выбора</b>
+        <p>MP3, WAV, M4A, AAC, MP4, MOV, WEBM и другие форматы</p>
+      </div>
+      <input type="file" id="fileInput" multiple accept="audio/*,video/*" hidden>
+
+      <div id="pendingPanel" style="display:none">
+        <div class="pending-files" id="pendingFiles"></div>
+        <div class="opts">
+          <div class="field">
+            <label>Модель</label>
+            <select id="modelSel"></select>
+          </div>
+          <div class="field">
+            <label>Язык</label>
+            <select id="langSel">
+              <option value="auto">Автоопределение</option>
+              <option value="ru" selected>Русский</option>
+              <option value="en">Английский</option>
+              <option value="kk">Казахский</option>
+              <option value="uk">Украинский</option>
+            </select>
+          </div>
+          <div class="toggle" id="diarToggle">
+            <div class="switch" id="diarSwitch"></div>
+            <span>Определять говорящих</span>
+          </div>
+          <div id="spkBox" style="display:none">
+            <label>Сколько говорящих</label>
+            <select id="spkSel">
+              <option value="0" selected>Авто</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+              <option value="7">7</option>
+              <option value="8">8</option>
+            </select>
+          </div>
+        </div>
+        <div class="hint" id="modelHint"></div>
+        <div class="pending-actions">
+          <button class="btn ghost sm" onclick="cancelPending()"><svg class="i sm"><use href="#i-x"/></svg> Очистить</button>
+          <button class="btn primary new-btn" onclick="startPending()"><svg class="i sm"><use href="#i-mic"/></svg> Транскрибировать</button>
+        </div>
+      </div>
+
+      <div id="queue"></div>
+    </div>
+  </div>
+
+  <!-- ========== RECORDINGS ========== -->
+  <div class="view" id="view-recordings">
+    <div class="rec-head">
+      <h1 id="recViewTitle">Все записи</h1>
+    </div>
+    <div class="rec-search">
+      <input type="search" id="recSearch" placeholder="Поиск транскрипций…" autocomplete="off">
+    </div>
+    <table class="rec-table">
+      <thead>
+        <tr>
+          <th style="width:34%">Название файла</th>
+          <th>Участники</th>
+          <th>Создано</th>
+          <th>Статус</th>
+          <th>Длительность</th>
+          <th style="width:50px"></th>
+        </tr>
+      </thead>
+      <tbody id="recBody"></tbody>
+    </table>
+  </div>
+
+  <!-- ========== TRANSCRIPT ========== -->
+  <div class="view" id="view-transcript">
+    <button class="btn ghost back-btn" onclick="show('recordings')"><svg class="i sm"><use href="#i-back"/></svg> Назад</button>
+    <div class="t-head">
+      <div class="name-edit" id="nameWrap">
+        <h1 id="tName"></h1>
+        <button class="icon-btn" id="nameEditBtn" onclick="startNameEdit()" title="Переименовать"><svg class="i"><use href="#i-pencil"/></svg></button>
+        <input id="tNameInput" type="text" style="display:none" spellcheck="false">
+        <button class="icon-btn primary" id="nameSaveBtn" onclick="commitNameEdit()" style="display:none" title="Сохранить"><svg class="i"><use href="#i-check"/></svg></button>
+        <button class="icon-btn" id="nameCancelBtn" onclick="cancelNameEdit()" style="display:none" title="Отмена"><svg class="i"><use href="#i-x"/></svg></button>
+      </div>
+    </div>
+    <div class="sub" id="tMeta"></div>
+    <audio id="player" controls></audio>
+    <div class="toolbar">
+      <div class="dropdown" id="exportDd">
+        <button class="btn primary sm" onclick="toggleDd()"><svg class="i sm"><use href="#i-download"/></svg> Экспорт <svg class="i sm"><use href="#i-chevron-down"/></svg></button>
+        <div class="menu">
+          <div onclick="doExport('txt')">Текст (.txt)</div>
+          <div onclick="doExport('docx')">Word (.docx)</div>
+          <div onclick="doExport('srt')">Субтитры (.srt)</div>
+          <div onclick="doExport('vtt')">Субтитры (.vtt)</div>
+        </div>
+      </div>
+      <button class="btn ghost sm" onclick="copyAll()"><svg class="i sm"><use href="#i-copy"/></svg> Копировать</button>
+      <button class="btn danger sm" onclick="deleteRec()"><svg class="i sm"><use href="#i-trash"/></svg> Удалить</button>
+      <span style="flex:1"></span>
+      <div class="search-box">
+        <svg class="i sm"><use href="#i-search"/></svg>
+        <input type="search" id="segSearch" placeholder="Поиск по тексту…" autocomplete="off">
+      </div>
+      <label class="toggle" style="padding:0;font-size:12px">
+        <input type="checkbox" id="showTs" checked> Время
+      </label>
+      <label class="toggle" style="padding:0;font-size:12px">
+        <input type="checkbox" id="showSpk" checked> Спикеры
+      </label>
+      <label class="toggle" style="padding:0;font-size:12px">
+        <input type="checkbox" id="onlyBm"> Только закладки
+      </label>
+    </div>
+    <div class="speakers-panel" id="speakersPanel"></div>
+    <div class="panel" id="segments"></div>
+  </div>
+
+  <!-- ========== SETTINGS ========== -->
+  <div class="view" id="view-settings">
+    <h1>Настройки</h1>
+    <div class="sub">Параметры по умолчанию для новых транскрипций.</div>
+    <div class="panel">
+      <div class="row-between" style="margin-bottom:16px">
+        <div><b>Тема оформления</b><div class="meta">Светлая, тёмная или как в системе</div></div>
+        <div class="seg-toggle" id="themeSeg">
+          <button data-val="light">Светлая</button>
+          <button data-val="dark">Тёмная</button>
+          <button data-val="system">Системная</button>
+        </div>
+      </div>
+      <div class="row-between" style="margin-bottom:16px">
+        <div><b>Счётчики в проектах</b><div class="meta">Показывать число записей рядом с проектом</div></div>
+        <div class="switch" id="countSwitch" onclick="toggleProjectCount()"></div>
+      </div>
+      <div class="row-between" style="margin-bottom:16px">
+        <div><b>Запускать при старте Windows</b><div class="meta">Программа будет автоматически открываться в трее</div></div>
+        <div class="switch" id="autostartSwitch" onclick="toggleAutostart()"></div>
+      </div>
+      <div class="row-between" style="margin-bottom:16px">
+        <div><b>Устройство вычислений</b><div class="meta" id="setDevice">—</div></div>
+      </div>
+      <div class="row-between">
+        <div><b>Распознавание говорящих</b><div class="meta" id="setDiar">—</div></div>
+      </div>
+    </div>
+    <div class="hint">
+      Модели Whisper при первом использовании скачиваются автоматически (нужен интернет
+      один раз). Далее всё работает офлайн. Чем крупнее модель — тем точнее русский,
+      но тем больше нужно памяти и времени.
+    </div>
+
+    <h2 style="margin:32px 0 12px;font-size:18px">Диктовка</h2>
+    <div class="sub">Зажмите клавишу — программа запишет с микрофона и вставит распознанный текст в активное окно.</div>
+    <div class="panel">
+      <div class="row-between" style="margin-bottom:16px">
+        <div><b>Включить</b><div class="meta" id="dictStatusText">—</div></div>
+        <div class="switch" id="dictEnabled" onclick="toggleDictation()"></div>
+      </div>
+      <div class="row-between" style="margin-bottom:16px">
+        <div><b>Клавиша / комбинация</b><div class="meta" id="dictHotkey">—</div></div>
+        <button class="btn ghost sm" onclick="captureHotkey()">Изменить</button>
+      </div>
+      <div class="row-between" style="margin-bottom:16px" id="dictHoldRow">
+        <div><b>Задержка до старта</b><div class="meta">Только для одиночной клавиши — чтобы случайно не сработало</div></div>
+        <select id="dictHold" onchange="updateDictSetting('hold_ms',parseInt(this.value))" style="padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:13px">
+          <option value="0">Без задержки</option>
+          <option value="500">0.5 сек</option>
+          <option value="1000" selected>1 секунда</option>
+          <option value="1500">1.5 сек</option>
+          <option value="2000">2 секунды</option>
+        </select>
+      </div>
+      <div class="row-between" style="margin-bottom:16px">
+        <div><b>Модель</b><div class="meta">Чем меньше — тем быстрее</div></div>
+        <select id="dictModel" onchange="updateDictSetting('model',this.value)" style="padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:13px">
+          <option value="small">small (быстро)</option>
+          <option value="medium">medium</option>
+          <option value="large-v3">large-v3 (точнее)</option>
+        </select>
+      </div>
+      <div class="row-between" style="margin-bottom:16px">
+        <div><b>Язык</b><div class="meta">Язык, на котором вы будете диктовать</div></div>
+        <select id="dictLang" onchange="updateDictSetting('language',this.value)" style="padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:13px">
+          <option value="ru">Русский</option>
+          <option value="en">English</option>
+          <option value="auto">Авто</option>
+        </select>
+      </div>
+      <div class="row-between">
+        <div><b>Микрофон</b><div class="meta">Источник аудио</div></div>
+        <select id="dictMic" onchange="updateDictSetting('device_index',this.value===''?null:parseInt(this.value))" style="padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--panel);color:var(--text);font-size:13px;max-width:260px">
+          <option value="">Системный по умолчанию</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal" id="modal">
+    <div class="modal-head">
+      <h3 id="modalTitle"></h3>
+      <button class="modal-x" onclick="closeModal(null)"><svg class="i"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-foot">
+      <button class="btn ghost sm" onclick="closeModal(null)" id="modalCancel">Отмена</button>
+      <button class="btn primary sm" onclick="confirmModal()" id="modalOk">OK</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ---------------------------------------------------------------- state
+let STATUS = {};
+let queue = [];          // {fileId, name, jobId, status, progress}
+let diarize = false;
+let currentRec = null;
+
+const MODEL_HINTS = {
+  "small":   "small — быстрая, но на русском заметно ошибается. Для черновика.",
+  "medium":  "medium — оптимальный баланс. Хорошее качество русского, умеренная скорость.",
+  "large-v3":"large-v3 — лучшее качество русского. Медленнее, нужно больше памяти/GPU."
+};
+
+// ---------------------------------------------------------------- helpers
+const $ = s => document.querySelector(s);
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),2600);}
+
+let _modalResolve=null;
+function openModal({title,body,okText='OK',okClass='primary',cancelText='Отмена',focus=null}){
+  return new Promise(resolve=>{
+    _modalResolve = resolve;
+    $('#modalTitle').textContent = title;
+    $('#modalBody').innerHTML = body;
+    $('#modalOk').textContent = okText;
+    $('#modalOk').className = 'btn '+okClass+' sm';
+    $('#modalCancel').textContent = cancelText;
+    $('#modalBackdrop').classList.add('show');
+    if(focus){
+      setTimeout(()=>{
+        const el=$('#'+focus);
+        if(el){el.focus();if(el.select)el.select();}
+      },50);
+    }
+  });
+}
+function closeModal(val){
+  if(!_modalResolve) return;
+  const r=_modalResolve;_modalResolve=null;
+  $('#modalBackdrop').classList.remove('show');
+  r(val);
+}
+function confirmModal(){
+  const inp=$('#modalInput');
+  closeModal(inp ? inp.value.trim() : true);
+}
+$('#modalBackdrop').addEventListener('click',e=>{if(e.target.id==='modalBackdrop') closeModal(null);});
+document.addEventListener('keydown',e=>{
+  if(!_modalResolve) return;
+  if(e.key==='Escape'){e.preventDefault();closeModal(null);}
+  else if(e.key==='Enter' && !e.shiftKey){
+    if(e.target.tagName!=='TEXTAREA'){e.preventDefault();confirmModal();}
+  }
+});
+function promptModal(title,{label='Название',value='',placeholder='',okText='Сохранить'}={}){
+  const body = `${label?`<label>${label}</label>`:''}<input type="text" id="modalInput" value="${escapeAttr(value)}" placeholder="${escapeAttr(placeholder)}">`;
+  return openModal({title,body,okText,focus:'modalInput'});
+}
+function confirmDialog(title,message,{okText='Удалить',okClass='danger'}={}){
+  return openModal({title,body:`<p>${escapeHtml(message)}</p>`,okText,okClass});
+}
+function fmtDur(s){s=Math.round(s||0);const m=Math.floor(s/60);
+  return m+':'+String(s%60).padStart(2,'0');}
+function fmtTs(t){t=Math.max(0,t||0);const m=Math.floor(t/60);
+  return m+':'+String(Math.floor(t%60)).padStart(2,'0');}
+
+function show(v){
+  document.querySelectorAll('.view').forEach(e=>e.classList.remove('active'));
+  $('#view-'+v).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(e=>{
+    const isActive = e.dataset.view===v && (v!=='recordings' || (e.dataset.filter===currentFilter || (!e.dataset.filter && v!=='recordings')));
+    e.classList.toggle('active', isActive);
+  });
+  if(v==='recordings') loadRecordings();
+  if(v==='settings'){ loadDictation(); refreshAutostart(); }
+}
+document.querySelectorAll('.nav-item[data-view]').forEach(n=>{
+  if(n.dataset.filter==='all'){
+    n.onclick=()=>{currentFilter='all';show('recordings');};
+  } else if(!n.dataset.filter){
+    n.onclick=()=>show(n.dataset.view);
+  }
+});
+
+// ---------------------------------------------------------------- init
+async function init(){
+  STATUS = await fetch('/api/status').then(r=>r.json());
+  const sel=$('#modelSel');
+  STATUS.models.forEach(m=>{
+    const o=document.createElement('option');
+    o.value=m;o.textContent=m;
+    if(m===STATUS.default_model)o.selected=true;
+    sel.appendChild(o);
+  });
+  sel.onchange=updateHint;
+  updateHint();
+  try{
+    const about = await fetch('/api/about').then(r=>r.json());
+    $('#appVer').textContent = 'v'+about.version;
+  }catch(e){}
+  checkForUpdates();
+  setInterval(checkForUpdates, 6*60*60*1000); // раз в 6 часов
+  $('#setDevice').textContent=
+    STATUS.device==='cuda' ? 'GPU NVIDIA (быстро)' : 'Процессор / CPU (медленнее)';
+  $('#setDiar').textContent= STATUS.diarization
+    ? 'Доступно' : 'Недоступно — нужен pyannote.audio и токен (см. README)';
+  applyThemeMode(localStorage.getItem('theme') || 'system');
+  setProjectCount(localStorage.getItem('showCounts') !== '0');
+  $('#recSearch').oninput = renderRecordings;
+  await loadRecordings();
+}
+function updateHint(){ $('#modelHint').textContent = MODEL_HINTS[$('#modelSel').value]||''; }
+
+// ---------------------------------------------------------------- diarize toggle
+$('#diarToggle').onclick=()=>{
+  if(!STATUS.diarization){
+    toast('Диаризация недоступна');return;
+  }
+  diarize=!diarize;
+  $('#diarSwitch').classList.toggle('on',diarize);
+  $('#spkBox').style.display = diarize ? '' : 'none';
+};
+
+// ---------------------------------------------------------------- upload
+const drop=$('#drop'), fileInput=$('#fileInput');
+drop.onclick=()=>fileInput.click();
+fileInput.onchange=e=>handleFiles([...e.target.files]);
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{
+  e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{
+  e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>handleFiles([...e.dataTransfer.files]));
+
+let pendingFiles = [];
+
+function handleFiles(files){
+  if(!files.length) return;
+  pendingFiles = pendingFiles.concat(files);
+  renderPending();
+  $('#pendingPanel').style.display='';
+  $('#drop').style.display='none';
+}
+function renderPending(){
+  const box = $('#pendingFiles');
+  box.innerHTML = pendingFiles.map((f,i)=>
+    `<div class="pending-file"><svg class="i sm"><use href="#i-mic"/></svg>
+      <span class="pf-name">${escapeHtml(f.name)}</span>
+      <span class="pf-size">${(f.size/1024/1024).toFixed(1)} МБ</span>
+      <button class="icon-btn pf-x" onclick="removePending(${i})"><svg class="i sm"><use href="#i-x"/></svg></button>
+    </div>`).join('');
+}
+function removePending(i){
+  pendingFiles.splice(i,1);
+  if(!pendingFiles.length) cancelPending();
+  else renderPending();
+}
+function cancelPending(){
+  pendingFiles = [];
+  $('#pendingPanel').style.display='none';
+  $('#drop').style.display='';
+  $('#fileInput').value='';
+}
+async function startPending(){
+  const files = pendingFiles.slice();
+  const lang = $('#langSel').value;
+  const model = $('#modelSel').value;
+  const dia = diarize;
+  const spk = dia ? ($('#spkSel').value || 0) : 0;
+  cancelPending();
+  for(const f of files){
+    const item={name:f.name,status:'uploading',progress:0,jobId:null};
+    queue.unshift(item);renderQueue();
+    try{
+      const fd=new FormData();fd.append('file',f);
+      const up=await fetch('/api/upload',{method:'POST',body:fd}).then(r=>r.json());
+      const tf=new FormData();
+      tf.append('file',up.file);tf.append('name',f.name);
+      tf.append('language',lang);
+      tf.append('model',model);
+      tf.append('diarize',dia);
+      tf.append('num_speakers',spk);
+      const job=await fetch('/api/transcribe',{method:'POST',body:tf}).then(r=>r.json());
+      item.jobId=job.job;item.status='queued';
+      pollJob(item);
+    }catch(err){
+      item.status='error';item.error=String(err);renderQueue();
+    }
+  }
+}
+
+function pollJob(item){
+  const iv=setInterval(async()=>{
+    try{
+      const j=await fetch('/api/job/'+item.jobId).then(r=>r.json());
+      // Если пользователь нажал «Отменить» — не возвращаем статус обратно к «Распознавание»,
+      // только финальные состояния перекрывают «cancelling».
+      if(item.status==='cancelling'){
+        if(j.status==='cancelled'||j.status==='done'||j.status==='error'){
+          item.status='cancelled'; clearInterval(iv); renderQueue();
+        }
+        return;
+      }
+      item.status=j.status; item.progress=j.progress||0; item.message=j.message;
+      if(j.status==='done'){
+        clearInterval(iv); item.recId=j.recording_id;
+        if(j.diar_warning) toast(j.diar_warning);
+      }
+      if(j.status==='error'){clearInterval(iv); item.error=j.error;}
+      if(j.status==='cancelled'){clearInterval(iv);}
+      renderQueue();
+    }catch(e){clearInterval(iv);}
+  },1000);
+}
+
+const ST_LABEL={uploading:'Загрузка',queued:'В очереди',loading:'Модель',
+  transcribing:'Распознавание',diarizing:'Говорящие',done:'Готово',
+  error:'Ошибка',cancelled:'Отменено',cancelling:'Отменяю…'};
+
+async function cancelJob(item){
+  if(!item.jobId){ item.status='cancelled'; renderQueue(); return; }
+  // Мгновенно показываем «Отменяю…», чтобы пользователь видел реакцию
+  item.status='cancelling';
+  item.message='ожидание остановки распознавания…';
+  renderQueue();
+  try{
+    await fetch('/api/job/'+item.jobId+'/cancel',{method:'POST'});
+  }catch(e){ toast('Не удалось отменить'); }
+}
+
+function renderQueue(){
+  const q=$('#queue');q.innerHTML='';
+  queue.forEach((it,idx)=>{
+    const div=document.createElement('div');div.className='qitem';
+    const running=['uploading','queued','loading','transcribing','diarizing'].includes(it.status);
+    let right='';
+    if(it.status==='done')
+      right=`<button class="btn primary sm" data-act="open">Открыть</button>`;
+    else if(it.status==='error'||it.status==='cancelled')
+      right=`<button class="btn ghost sm" data-act="remove"><svg class="i sm"><use href="#i-x"/></svg></button>`;
+    else if(it.status==='cancelling')
+      right=`<span class="meta" style="opacity:.7">Отмена…</span>`;
+    else
+      right=`<div class="bar"><div style="width:${Math.round(it.progress*100)}%"></div></div>
+             <button class="btn ghost sm" data-act="cancel" title="Отменить" style="margin-left:8px;padding:6px 8px"><svg class="i sm"><use href="#i-x"/></svg></button>`;
+    const pillClass = it.status==='done' ? 'ok'
+      : (it.status==='error'||it.status==='cancelled') ? 'err' : 'run';
+    div.innerHTML=`
+      <span class="pill ${pillClass}">${ST_LABEL[it.status]||it.status}</span>
+      <div class="name">${escapeHtml(it.name)}</div>
+      ${running?`<span class="meta">${it.message||''}</span>`:''}
+      <div class="act" style="display:flex;align-items:center"></div>`;
+    div.querySelector('.act').innerHTML=right;
+    const actBtn=div.querySelector('[data-act]');
+    if(actBtn){
+      const a=actBtn.dataset.act;
+      if(a==='open') actBtn.onclick=()=>openRecording(it.recId);
+      else if(a==='cancel') actBtn.onclick=()=>cancelJob(it);
+      else if(a==='remove') actBtn.onclick=()=>{ queue.splice(idx,1); renderQueue(); };
+    }
+    if(it.status==='error') div.title=it.error||'';
+    q.appendChild(div);
+  });
+}
+
+// ---------------------------------------------------------------- recordings & projects
+let PROJECTS = [];
+let NO_PROJECT_COUNT = 0;
+let RECORDINGS_CACHE = [];
+let currentFilter = 'all';
+
+function fmtDate(iso){
+  if(!iso) return '';
+  const [d,t]=iso.split('T');
+  const [y,mo,da]=d.split('-');
+  const months=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+  return `${parseInt(da)} ${months[parseInt(mo)-1]} ${y}<div style="font-size:12px;color:var(--muted);margin-top:2px">${(t||'').slice(0,5)}</div>`;
+}
+
+async function loadProjects(){
+  const r = await fetch('/api/projects').then(r=>r.json());
+  PROJECTS = r.projects;
+  NO_PROJECT_COUNT = r.no_project_count;
+  renderSidebarProjects();
+}
+
+function renderSidebarProjects(){
+  const list = $('#projectList');
+  let html = `<div class="nav-item proj" data-filter="none"><span class="ico"><svg class="i"><use href="#i-folder"/></svg></span> Без проекта <span class="count">${NO_PROJECT_COUNT}</span></div>`;
+  PROJECTS.forEach(p=>{
+    html += `<div class="nav-item proj" data-filter="${escapeAttr(p.name)}">
+      <span class="ico"><svg class="i"><use href="#i-folder"/></svg></span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px">${escapeHtml(p.name)}</span>
+      <span class="count">${p.count}</span>
+      <button class="proj-menu-btn" onclick="event.stopPropagation();projectMenu(event,'${escapeAttr(p.name)}')"><svg class="i sm"><use href="#i-settings"/></svg></button>
+    </div>`;
+  });
+  list.innerHTML = html;
+  list.querySelectorAll('.nav-item.proj').forEach(n=>{
+    n.onclick=()=>{currentFilter=n.dataset.filter;show('recordings');};
+  });
+  // total count
+  const total = RECORDINGS_CACHE.length;
+  if($('#cntAll')) $('#cntAll').textContent = total ? total : '';
+  // active highlight
+  document.querySelectorAll('.nav-item.proj, .nav-item[data-filter="all"]').forEach(n=>{
+    n.classList.toggle('active', n.dataset.filter===currentFilter && document.querySelector('#view-recordings').classList.contains('active'));
+  });
+}
+
+function escapeAttr(s){return String(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+async function loadRecordings(){
+  RECORDINGS_CACHE = await fetch('/api/recordings').then(r=>r.json());
+  await loadProjects();
+  renderRecordings();
+}
+
+function renderRecordings(){
+  const body = $('#recBody');
+  const search = ($('#recSearch')?.value||'').trim().toLowerCase();
+  let list = RECORDINGS_CACHE.slice();
+  if(currentFilter==='none') list = list.filter(r=>!r.project);
+  else if(currentFilter!=='all') list = list.filter(r=>r.project===currentFilter);
+  if(search) list = list.filter(r=>r.name.toLowerCase().includes(search));
+
+  // title
+  let title = 'Все записи';
+  if(currentFilter==='none') title='Без проекта';
+  else if(currentFilter!=='all') title=currentFilter;
+  $('#recViewTitle').textContent = title;
+
+  if(!list.length){
+    body.innerHTML = `<tr class="empty-row"><td colspan="6">${search?'Ничего не найдено':'Пока нет ни одной транскрипции'}</td></tr>`;
+    return;
+  }
+  body.innerHTML = list.map(r=>{
+    const names = r.speaker_names && r.speaker_names.length
+      ? r.speaker_names.slice(0,2).map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join('')
+        + (r.speaker_names.length>2?`<span class="badge gray">+${r.speaker_names.length-2}</span>`:'')
+      : '<span style="color:var(--muted)">—</span>';
+    return `<tr data-id="${r.id}">
+      <td><div class="name-cell"><span class="file-ico"><svg class="i sm"><use href="#i-mic"/></svg></span> ${escapeHtml(r.name)}</div></td>
+      <td><div class="badges">${names}</div></td>
+      <td>${fmtDate(r.created)}</td>
+      <td><span class="status-done">Завершено</span></td>
+      <td>${fmtDur(r.duration)}</td>
+      <td class="row-actions"><button class="dots" onclick="event.stopPropagation();rowMenu(event,'${r.id}')">⋮</button></td>
+    </tr>`;
+  }).join('');
+  body.querySelectorAll('tr[data-id]').forEach(tr=>{
+    tr.onclick=()=>openRecording(tr.dataset.id);
+  });
+}
+
+function rowMenu(ev,id){
+  const btn = ev.currentTarget;
+  const cell = btn.parentElement;
+  const wasOpen = cell.classList.contains('open');
+  closeAllMenus();
+  if(wasOpen) return;
+  const rec = RECORDINGS_CACHE.find(r=>r.id===id);
+  if(!rec) return;
+  const rect = btn.getBoundingClientRect();
+  cell.classList.add('open');
+  const projItems = [
+    {name:null,label:'Без проекта'},
+    ...PROJECTS.map(p=>({name:p.name,label:p.name})),
+  ].map(p=>`<div class="item ${(rec.project||null)===p.name?'checked':''}" onclick="moveRecording('${id}',${p.name===null?'null':`'${escapeAttr(p.name)}'`})">${escapeHtml(p.label)}</div>`).join('');
+  cell.innerHTML = btn.outerHTML + `<div class="menu">
+    <div class="item" onclick="event.stopPropagation();renameRecordingPrompt('${id}')"><svg class="i sm"><use href="#i-pencil"/></svg> Переименовать</div>
+    <hr>
+    <div class="section">Переместить в</div>
+    ${projItems}
+    <div class="item" onclick="event.stopPropagation();createProjectPrompt('${id}')"><svg class="i sm"><use href="#i-plus"/></svg> Новый проект…</div>
+    <hr>
+    <div class="item danger" onclick="deleteRecording('${id}')"><svg class="i sm"><use href="#i-trash"/></svg> Удалить</div>
+  </div>`;
+  const menu = cell.querySelector('.menu');
+  menu.style.display='block';
+  const menuW = menu.offsetWidth || 230;
+  const menuH = menu.offsetHeight;
+  let left = rect.right - menuW;
+  if(left < 8) left = 8;
+  let top = rect.bottom + 4;
+  if(top + menuH > window.innerHeight - 8) top = rect.top - menuH - 4;
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+}
+
+async function renameRecordingPrompt(id){
+  closeAllMenus();
+  const rec = RECORDINGS_CACHE.find(r=>r.id===id);
+  if(!rec) return;
+  const nn = await promptModal('Переименовать запись',{label:'Новое название',value:rec.name});
+  if(!nn||!nn.trim()) return;
+  await fetch('/api/recordings/'+id,{
+    method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:nn.trim()})
+  });
+  await loadRecordings();
+}
+
+function closeAllMenus(){
+  document.querySelectorAll('.row-actions.open, .nav-item.proj.open, .spk.open').forEach(c=>c.classList.remove('open'));
+  document.querySelectorAll('.row-actions .menu, .proj-menu').forEach(m=>m.remove());
+}
+document.addEventListener('click',closeAllMenus);
+
+async function moveRecording(id,project){
+  await fetch('/api/recordings/'+id,{
+    method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({project:project||null})
+  });
+  toast(project?`Перемещено в «${project}»`:'Перемещено в «Без проекта»');
+  await loadRecordings();
+}
+
+async function deleteRecording(id){
+  closeAllMenus();
+  const rec = RECORDINGS_CACHE.find(r=>r.id===id);
+  const ok = await confirmDialog('Удалить запись?',
+    rec ? `«${rec.name}» будет удалена без возможности восстановления.` : 'Запись будет удалена без возможности восстановления.');
+  if(!ok) return;
+  await fetch('/api/recordings/'+id,{method:'DELETE'});
+  await loadRecordings();
+}
+
+async function createProjectPrompt(moveAfterId){
+  closeAllMenus();
+  const name = await promptModal('Создать проект',{label:'Название проекта',placeholder:'Например, Интервью январь',okText:'Создать'});
+  if(!name||!name.trim()) return;
+  const r = await fetch('/api/projects',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:name.trim()})
+  });
+  if(!r.ok){toast((await r.json()).detail||'Ошибка');return;}
+  if(moveAfterId) await moveRecording(moveAfterId,name.trim());
+  else { await loadProjects(); }
+}
+
+function projectMenu(ev,projName){
+  const btn = ev.currentTarget;
+  const item = btn.closest('.nav-item.proj');
+  const wasOpen = item.classList.contains('open');
+  closeAllMenus();
+  if(wasOpen) return;
+  const rect = btn.getBoundingClientRect();
+  item.classList.add('open');
+  const menu = document.createElement('div');
+  menu.className = 'menu proj-menu';
+  menu.innerHTML = `
+    <div class="item" onclick="event.stopPropagation();renameProjectPrompt('${escapeAttr(projName)}')"><svg class="i sm"><use href="#i-pencil"/></svg> Переименовать</div>
+    <div class="item danger" onclick="event.stopPropagation();deleteProjectConfirm('${escapeAttr(projName)}')"><svg class="i sm"><use href="#i-trash"/></svg> Удалить</div>
+  `;
+  document.body.appendChild(menu);
+  menu.style.display='block';
+  const menuW = menu.offsetWidth || 200;
+  const menuH = menu.offsetHeight;
+  let left = rect.right + 6;
+  if(left + menuW > window.innerWidth - 8) left = rect.left - menuW - 6;
+  let top = rect.top;
+  if(top + menuH > window.innerHeight - 8) top = window.innerHeight - menuH - 8;
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+}
+
+async function renameProjectPrompt(projName){
+  closeAllMenus();
+  const nn = await promptModal('Переименовать проект',{label:'Новое название',value:projName});
+  if(!nn||!nn.trim()||nn.trim()===projName) return;
+  const r = await fetch('/api/projects/'+encodeURIComponent(projName),{
+    method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:nn.trim()})
+  });
+  if(!r.ok){toast((await r.json()).detail||'Ошибка');return;}
+  if(currentFilter===projName) currentFilter=nn.trim();
+  await loadRecordings();
+}
+
+async function deleteProjectConfirm(projName){
+  closeAllMenus();
+  const ok = await confirmDialog('Удалить проект?',
+    `Проект «${projName}» будет удалён. Записи из него останутся в разделе «Без проекта».`);
+  if(!ok) return;
+  await fetch('/api/projects/'+encodeURIComponent(projName),{method:'DELETE'});
+  if(currentFilter===projName) currentFilter='all';
+  await loadRecordings();
+}
+
+async function openRecording(id){
+  closeAllMenus();
+  HIDDEN_SPEAKERS.clear();
+  currentRec=await fetch('/api/recordings/'+id).then(r=>r.json());
+  $('#tName').textContent=currentRec.name;
+  $('#tMeta').textContent=
+    `${currentRec.created.replace('T',' ')} · ${fmtDur(currentRec.duration)} · `+
+    `язык: ${currentRec.language||'—'} · модель: ${currentRec.model||'—'}`;
+  $('#player').src='/api/audio/'+currentRec.audio;
+  renderSegments();
+  show('transcript');
+}
+
+function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+const HIDDEN_SPEAKERS = new Set();
+function uniqueSpeakers(){
+  const out=[];
+  (currentRec?.segments||[]).forEach(s=>{
+    if(s.speaker && !out.includes(s.speaker)) out.push(s.speaker);
+  });
+  return out;
+}
+function renderSpeakersPanel(){
+  const panel=$('#speakersPanel');
+  const list=uniqueSpeakers();
+  if(!list.length){panel.classList.remove('has-content');panel.innerHTML='';return;}
+  panel.classList.add('has-content');
+  panel.innerHTML = `<div class="sp-head"><svg class="i sm"><use href="#i-users"/></svg> Найдены говорящие · ${list.length}</div>
+    <div class="sp-chips">${list.map(name=>`
+      <div class="sp-chip ${HIDDEN_SPEAKERS.has(name)?'hidden':''}" data-name="${escapeAttr(name)}">
+        <span class="sp-name">${escapeHtml(name)}</span>
+        <button class="sp-act" title="Переименовать" onclick="event.stopPropagation();renameSpeakerPrompt('${escapeAttr(name)}')"><svg class="i sm"><use href="#i-pencil"/></svg></button>
+        <button class="sp-act eye" title="Скрыть/показать" onclick="event.stopPropagation();toggleSpeakerVisible('${escapeAttr(name)}')"><svg class="i sm"><use href="#${HIDDEN_SPEAKERS.has(name)?'i-eye-off':'i-eye'}"/></svg></button>
+      </div>`).join('')}</div>`;
+}
+function toggleSpeakerVisible(name){
+  if(HIDDEN_SPEAKERS.has(name)) HIDDEN_SPEAKERS.delete(name); else HIDDEN_SPEAKERS.add(name);
+  renderSegments();
+}
+function renderSegments(){
+  renderSpeakersPanel();
+  const showTs=$('#showTs').checked;
+  const showSpk=$('#showSpk').checked;
+  const onlyBm=$('#onlyBm').checked;
+  const query=($('#segSearch')?.value||'').trim().toLowerCase();
+  const box=$('#segments');box.innerHTML='';
+  let visible=0;
+  currentRec.segments.forEach((s,i)=>{
+    if(query && !s.text.toLowerCase().includes(query)) return;
+    if(onlyBm && !s.bookmark) return;
+    if(s.speaker && HIDDEN_SPEAKERS.has(s.speaker)) return;
+    visible++;
+    const div=document.createElement('div');
+    div.className='seg'+(s.bookmark?' bookmarked':'');
+    let html='';
+    if(showTs)
+      html+=`<span class="ts" data-t="${s.start}">${fmtTs(s.start)}</span>`;
+    if(showSpk && s.speaker)
+      html+=`<span class="spk" data-i="${i}">${s.speaker}</span>`;
+    html+=`<div class="txt" contenteditable="true" data-i="${i}">${escapeHtml(s.text)}</div>`;
+    html+=`<button class="icon-btn primary seg-save" title="Сохранить (Enter)"><svg class="i sm"><use href="#i-check"/></svg></button>`;
+    html+=`<button class="icon-btn seg-bm" data-i="${i}" title="Закладка"><svg class="i"><use href="#i-star"/></svg></button>`;
+    div.innerHTML=html;
+    box.appendChild(div);
+  });
+  if(!visible){
+    const msg = query ? 'Ничего не найдено' : (onlyBm ? 'Нет закладок' : '');
+    if(msg) box.innerHTML=`<div class="empty" style="padding:20px;text-align:center;color:var(--muted)">${msg}</div>`;
+  }
+  box.querySelectorAll('.seg-bm').forEach(b=>b.onclick=e=>{
+    e.stopPropagation();
+    toggleBookmark(parseInt(b.dataset.i));
+  });
+  box.querySelectorAll('.ts').forEach(t=>t.onclick=()=>{
+    const p=$('#player');p.currentTime=parseFloat(t.dataset.t);p.play();
+  });
+  box.querySelectorAll('.spk').forEach(sp=>sp.onclick=e=>{e.stopPropagation();speakerMenu(e,parseInt(sp.dataset.i));});
+  box.querySelectorAll('.txt').forEach(tx=>{
+    const seg=tx.closest('.seg');
+    const i=parseInt(tx.dataset.i);
+    let original=currentRec.segments[i].text;
+    tx.onfocus=()=>{original=tx.textContent;seg.classList.add('editing');};
+    tx.onblur=()=>{
+      currentRec.segments[i].text=tx.textContent.trim();
+      setTimeout(()=>seg.classList.remove('editing'),120);
+    };
+    tx.onkeydown=e=>{
+      if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();commitSegment(i,tx);}
+      else if(e.key==='Escape'){e.preventDefault();tx.textContent=original;tx.blur();}
+    };
+    seg.querySelector('.seg-save').onmousedown=e=>{e.preventDefault();commitSegment(i,tx);};
+  });
+}
+function speakerMenu(ev,i){
+  const sp = ev.currentTarget;
+  const wasOpen = sp.classList.contains('open');
+  closeAllMenus();
+  if(wasOpen) return;
+  sp.classList.add('open');
+  const rect = sp.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.className = 'menu proj-menu';
+  menu.innerHTML = `
+    <div class="item" onclick="event.stopPropagation();renameSpeakerPrompt('${escapeAttr(currentRec.segments[i].speaker)}')"><svg class="i sm"><use href="#i-pencil"/></svg> Переименовать спикера</div>
+    <div class="item" onclick="event.stopPropagation();reassignSegmentDialog(${i})"><svg class="i sm"><use href="#i-users"/></svg> Назначить другому</div>
+  `;
+  document.body.appendChild(menu);
+  menu.style.display='block';
+  const menuW = menu.offsetWidth || 220;
+  const menuH = menu.offsetHeight;
+  let left = rect.left;
+  if(left + menuW > window.innerWidth - 8) left = window.innerWidth - menuW - 8;
+  let top = rect.bottom + 4;
+  if(top + menuH > window.innerHeight - 8) top = rect.top - menuH - 4;
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+}
+
+async function reassignSegmentDialog(i){
+  closeAllMenus();
+  const cur = currentRec.segments[i].speaker;
+  const others = uniqueSpeakers().filter(n=>n!==cur);
+  const chipsHtml = others.length
+    ? `<label>Выбрать существующего</label><div class="pick-chips">${others.map(n=>`<button type="button" class="pick-chip" data-name="${escapeAttr(n)}">${escapeHtml(n)}</button>`).join('')}</div>`
+    : '';
+  const body = `${chipsHtml}<label style="margin-top:${others.length?'16px':'0'}">${others.length?'Или создать нового':'Имя нового спикера'}</label><input type="text" id="modalInput" placeholder="Например, Интервьюер">`;
+  const p = openModal({title:'Назначить реплику',body,okText:'Создать',okClass:'primary',focus:'modalInput'});
+  setTimeout(()=>{
+    document.querySelectorAll('.pick-chip').forEach(b=>{
+      b.onclick=()=>closeModal(b.dataset.name);
+    });
+  },0);
+  const v = await p;
+  if(!v||!String(v).trim()) return;
+  currentRec.segments[i].speaker = String(v).trim();
+  renderSegments();
+  await saveAllSegments();
+}
+
+async function saveAllSegments(){
+  currentRec.speakers = uniqueSpeakers().length;
+  await fetch('/api/recordings/'+currentRec.id,{
+    method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({segments:currentRec.segments})
+  });
+}
+
+async function renameSpeakerPrompt(old){
+  closeAllMenus();
+  const nn = await promptModal('Переименовать спикера',{label:`Заменит «${old}» во всех репликах`,value:old});
+  if(!nn||!nn.trim()||nn.trim()===old) return;
+  const v = nn.trim();
+  currentRec.segments.forEach(s=>{if(s.speaker===old) s.speaker=v;});
+  if(HIDDEN_SPEAKERS.has(old)){HIDDEN_SPEAKERS.delete(old);HIDDEN_SPEAKERS.add(v);}
+  renderSegments();
+  await saveAllSegments();
+  toast('Сохранено');
+}
+
+async function reassignSegment(i,newName){
+  closeAllMenus();
+  currentRec.segments[i].speaker = newName;
+  renderSegments();
+  await saveAllSegments();
+}
+
+async function reassignSegmentNewPrompt(i){
+  closeAllMenus();
+  const nn = await promptModal('Назначить новому спикеру',{label:'Имя нового спикера'});
+  if(!nn||!nn.trim()) return;
+  currentRec.segments[i].speaker = nn.trim();
+  renderSegments();
+  await saveAllSegments();
+}
+
+async function commitSegment(i,tx){
+  currentRec.segments[i].text=tx.textContent.trim();
+  tx.blur();
+  await fetch('/api/recordings/'+currentRec.id,{
+    method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({segments:currentRec.segments})
+  });
+  toast('Сохранено');
+}
+$('#showTs').onchange=renderSegments;
+$('#showSpk').onchange=renderSegments;
+$('#onlyBm').onchange=renderSegments;
+$('#segSearch').oninput=renderSegments;
+
+async function toggleBookmark(i){
+  currentRec.segments[i].bookmark=!currentRec.segments[i].bookmark;
+  renderSegments();
+  await fetch('/api/recordings/'+currentRec.id,{
+    method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({segments:currentRec.segments})
+  });
+}
+
+function startNameEdit(){
+  if(!currentRec) return;
+  $('#tNameInput').value=currentRec.name;
+  $('#tName').style.display='none';
+  $('#nameEditBtn').style.display='none';
+  $('#tNameInput').style.display='';
+  $('#nameSaveBtn').style.display='';
+  $('#nameCancelBtn').style.display='';
+  $('#tNameInput').focus();
+  $('#tNameInput').select();
+}
+function cancelNameEdit(){
+  $('#tNameInput').style.display='none';
+  $('#nameSaveBtn').style.display='none';
+  $('#nameCancelBtn').style.display='none';
+  $('#tName').style.display='';
+  $('#nameEditBtn').style.display='';
+}
+async function commitNameEdit(){
+  const v=$('#tNameInput').value.trim();
+  if(!v||!currentRec){cancelNameEdit();return;}
+  currentRec.name=v;
+  $('#tName').textContent=v;
+  cancelNameEdit();
+  await fetch('/api/recordings/'+currentRec.id,{
+    method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:v})
+  });
+  toast('Название сохранено');
+}
+$('#tNameInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'){e.preventDefault();commitNameEdit();}
+  else if(e.key==='Escape'){e.preventDefault();cancelNameEdit();}
+});
+
+async function saveTranscript(){
+  document.querySelectorAll('#segments .txt').forEach(tx=>{
+    currentRec.segments[tx.dataset.i].text=tx.textContent.trim();
+  });
+  await fetch('/api/recordings/'+currentRec.id,{
+    method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({name:currentRec.name,segments:currentRec.segments})
+  });
+  toast('Правки сохранены');
+}
+
+async function deleteRec(){
+  const ok = await confirmDialog('Удалить запись?',
+    `«${currentRec.name}» и её аудиофайл будут удалены без возможности восстановления.`);
+  if(!ok) return;
+  await fetch('/api/recordings/'+currentRec.id,{method:'DELETE'});
+  toast('Удалено');show('recordings');
+}
+
+function copyAll(){
+  const txt=currentRec.segments.map(s=>
+    (s.speaker?s.speaker+': ':'')+s.text).join('\n');
+  navigator.clipboard.writeText(txt).then(()=>toast('Скопировано в буфер'));
+}
+
+// ---------------------------------------------------------------- export
+function toggleDd(){ $('#exportDd').classList.toggle('open'); }
+document.addEventListener('click',e=>{
+  if(!e.target.closest('#exportDd')) $('#exportDd').classList.remove('open');
+});
+function doExport(fmt){
+  $('#exportDd').classList.remove('open');
+  window.open('/api/recordings/'+currentRec.id+'/export?format='+fmt,'_blank');
+}
+
+// ---------------------------------------------------------------- updates
+let _pendingUpdate = null;
+async function checkForUpdates(){
+  try{
+    const r = await fetch('/api/update/check').then(r=>r.json());
+    if(r.available && r.download_url){
+      _pendingUpdate = r;
+      const btn = $('#updateBtn');
+      btn.style.display = '';
+      btn.textContent = `Обновить → v${r.version}`;
+      btn.onclick = (e)=>{ e.preventDefault(); startUpdate(); };
+    }
+  }catch(e){}
+}
+async function startUpdate(){
+  if(!_pendingUpdate) return;
+  const ok = await confirmDialog(
+    'Обновить Whisper Studio?',
+    `Будет загружена и установлена версия ${_pendingUpdate.version}. ` +
+    `Программа автоматически перезапустится.`,
+    {okText:'Обновить', okClass:'primary'}
+  );
+  if(!ok) return;
+  // Заменяем содержимое окна на «Идёт обновление…»
+  document.body.innerHTML = `
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);color:var(--text);text-align:center;padding:40px">
+      <svg style="width:48px;height:48px;color:var(--accent);margin-bottom:16px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+      <h2 style="margin:0 0 8px;font-size:20px">Идёт обновление…</h2>
+      <p style="color:var(--muted);max-width:380px;line-height:1.5">Программа автоматически перезапустится, как только установка завершится. Это занимает 1–2 минуты.</p>
+    </div>`;
+  try{
+    await fetch('/api/update/install',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({url:_pendingUpdate.download_url})
+    });
+  }catch(e){}
+}
+
+// ---------------------------------------------------------------- theme
+const _themeMql = window.matchMedia('(prefers-color-scheme: dark)');
+function applyThemeMode(mode){
+  let actual = mode;
+  if(mode==='system') actual = _themeMql.matches ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', actual);
+  document.querySelectorAll('#themeSeg button').forEach(b=>
+    b.classList.toggle('active', b.dataset.val===mode));
+}
+function setTheme(mode){
+  localStorage.setItem('theme', mode);
+  applyThemeMode(mode);
+}
+// Если выбрана системная тема — следим за изменениями системы вживую
+_themeMql.addEventListener('change', ()=>{
+  if((localStorage.getItem('theme')||'system')==='system') applyThemeMode('system');
+});
+document.querySelectorAll('#themeSeg button').forEach(b=>{
+  b.onclick=()=>setTheme(b.dataset.val);
+});
+
+function setProjectCount(on){
+  document.body.classList.toggle('no-counts', !on);
+  $('#countSwitch').classList.toggle('on', on);
+  localStorage.setItem('showCounts', on ? '1' : '0');
+}
+function toggleProjectCount(){
+  setProjectCount(!document.body.classList.contains('no-counts') ? false : true);
+}
+
+async function refreshAutostart(){
+  try{
+    const r = await fetch('/api/autostart').then(r=>r.json());
+    $('#autostartSwitch').classList.toggle('on', !!r.enabled);
+  }catch(e){}
+}
+async function toggleAutostart(){
+  const on = $('#autostartSwitch').classList.contains('on');
+  $('#autostartSwitch').classList.toggle('on', !on);
+  try{
+    await fetch('/api/autostart',{
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({enabled: !on})
+    });
+    toast(!on ? 'Автозапуск включён' : 'Автозапуск выключен');
+  }catch(e){
+    $('#autostartSwitch').classList.toggle('on', on);
+    toast('Не удалось изменить');
+  }
+}
+
+// ---------------------------------------------------------------- dictation
+let DICT_SETTINGS = null;
+
+const KEY_LABEL = {
+  ctrl_l:'Левый Ctrl', ctrl_r:'Правый Ctrl',
+  alt_l:'Левый Alt', alt_r:'Правый Alt', alt_gr:'AltGr',
+  shift_l:'Левый Shift', shift_r:'Правый Shift',
+  cmd_l:'Левый Win', cmd_r:'Правый Win', cmd:'Win',
+  ctrl:'Ctrl', alt:'Alt', shift:'Shift',
+  space:'Space', enter:'Enter', tab:'Tab', esc:'Esc', caps_lock:'Caps Lock',
+};
+function keyName(k){return KEY_LABEL[k]||k.toUpperCase();}
+function hotkeyLabel(keys){return (keys||[]).map(keyName).join(' + ')||'не задано';}
+
+async function loadDictation(){
+  const r = await fetch('/api/dictation/status').then(r=>r.json());
+  DICT_SETTINGS = r.settings;
+  $('#dictEnabled').classList.toggle('on', !!r.settings.enabled);
+  $('#dictHotkey').textContent = hotkeyLabel(r.settings.hotkey);
+  $('#dictHold').value = String(r.settings.hold_ms||1000);
+  $('#dictModel').value = r.settings.model||'small';
+  $('#dictLang').value = r.settings.language||'ru';
+  $('#dictHoldRow').style.display = (r.settings.hotkey||[]).length===1 ? '' : 'none';
+  if(!r.available){
+    $('#dictStatusText').textContent = 'Недоступно (нет библиотек)';
+    $('#dictEnabled').style.opacity = .4;
+    $('#dictEnabled').style.pointerEvents = 'none';
+    return;
+  }
+  $('#dictStatusText').textContent = r.settings.enabled ? `Активна · ${statusLabel(r.status)}` : 'Выключена';
+  // Microphones
+  const mics = await fetch('/api/dictation/microphones').then(r=>r.json());
+  const sel = $('#dictMic');
+  while(sel.options.length>1) sel.remove(1);
+  mics.forEach(m=>{
+    const o = document.createElement('option');
+    o.value = String(m.index);
+    o.textContent = m.name;
+    if(r.settings.device_index===m.index) o.selected = true;
+    sel.appendChild(o);
+  });
+}
+
+function statusLabel(s){
+  return ({idle:'ожидание',listening:'удерживаете…',recording:'идёт запись',transcribing:'распознаём'})[s] || s;
+}
+
+async function updateDictSetting(key,val){
+  if(!DICT_SETTINGS) return;
+  const r = await fetch('/api/dictation/settings',{
+    method:'PUT',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({[key]:val})
+  }).then(r=>r.json());
+  DICT_SETTINGS = r;
+  toast('Сохранено');
+}
+
+async function toggleDictation(){
+  if(!DICT_SETTINGS) return;
+  const newVal = !DICT_SETTINGS.enabled;
+  await updateDictSetting('enabled', newVal);
+  await loadDictation();
+}
+
+let _hkCaptureKeys = new Set();
+function captureHotkey(){
+  _hkCaptureKeys = new Set();
+  const body = `
+    <p>Нажмите клавишу или комбинацию, затем отпустите все клавиши и нажмите «Сохранить».</p>
+    <div id="hkDisplay" style="margin-top:12px;padding:14px;border:1.5px dashed var(--border);border-radius:10px;text-align:center;font-size:15px;font-weight:600;color:var(--muted);min-height:50px;display:flex;align-items:center;justify-content:center">Ожидание нажатия…</div>
+    <div class="hint-small">Подсказка: для одиночной клавиши (например, Правый Ctrl) включится задержка перед стартом, чтобы случайно не сработало.</div>
+  `;
+  const onKeyDown = e=>{
+    e.preventDefault();
+    const name = _domKeyToName(e);
+    if(!name) return;
+    _hkCaptureKeys.add(name);
+    _updateHkDisplay();
+  };
+  document.addEventListener('keydown', onKeyDown, true);
+  openModal({title:'Назначить горячую клавишу',body,okText:'Сохранить',okClass:'primary'}).then(async ok=>{
+    document.removeEventListener('keydown', onKeyDown, true);
+    if(ok===null) return;
+    const keys = Array.from(_hkCaptureKeys);
+    if(!keys.length){toast('Клавиша не выбрана');return;}
+    await updateDictSetting('hotkey', keys);
+    await loadDictation();
+  });
+}
+function _updateHkDisplay(){
+  const el = document.getElementById('hkDisplay');
+  if(!el) return;
+  if(!_hkCaptureKeys.size){el.textContent='Ожидание нажатия…';return;}
+  el.style.color = 'var(--accent)';
+  el.textContent = Array.from(_hkCaptureKeys).map(keyName).join(' + ');
+}
+function _domKeyToName(e){
+  // map DOM KeyboardEvent.code/key to our pynput-style names
+  const c = e.code;
+  const k = e.key.toLowerCase();
+  if(c==='ControlLeft') return 'ctrl_l';
+  if(c==='ControlRight') return 'ctrl_r';
+  if(c==='AltLeft') return 'alt_l';
+  if(c==='AltRight') return 'alt_r';
+  if(c==='ShiftLeft') return 'shift_l';
+  if(c==='ShiftRight') return 'shift_r';
+  if(c==='MetaLeft') return 'cmd_l';
+  if(c==='MetaRight') return 'cmd_r';
+  if(c==='CapsLock') return 'caps_lock';
+  if(c==='Space') return 'space';
+  if(c==='Tab') return 'tab';
+  if(c==='Enter') return 'enter';
+  if(c==='Escape') return 'esc';
+  if(c && c.startsWith('F') && /^F\d+$/.test(c)) return c.toLowerCase();
+  if(c && c.startsWith('Key')) return c.slice(3).toLowerCase();
+  if(c && c.startsWith('Digit')) return c.slice(5);
+  if(k && k.length===1) return k;
+  return null;
+}
+
+// Poll status while on settings page
+setInterval(()=>{
+  if($('#view-settings').classList.contains('active') && DICT_SETTINGS && DICT_SETTINGS.enabled){
+    fetch('/api/dictation/status').then(r=>r.json()).then(r=>{
+      $('#dictStatusText').textContent = r.settings.enabled ? `Активна · ${statusLabel(r.status)}` : 'Выключена';
+    }).catch(()=>{});
+  }
+}, 1000);
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+# --- Виртуальные окружения и кэш Python ---
+.venv/
+.venv312/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# --- Пользовательские данные приложения ---
+data/uploads/
+data/recordings/
+data/projects.json
+data/dictation.json
+app.log
+
+# --- Большие модели (качаются автоматически или вручную) ---
+data/models/
+
+# --- Артефакты сборки установщика ---
+installer/python/
+installer/python-embed.zip
+installer/get-pip.py
+installer/app.ico
+installer/setup_deps.bat~
+dist-installer/
+
+# --- Логи и временные файлы ---
+*.log
+*.tmp
+*.bak
+.DS_Store
+Thumbs.db
+
+# --- IDE / редакторы ---
+.vscode/
+.idea/
+*.swp
+.claude/
+
+# --- Старые/устаревшие файлы ---
+/index.html
+resources/dictation_start.wav
