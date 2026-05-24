@@ -22,6 +22,8 @@ WizardStyle=modern
 SetupIconFile=app.ico
 UninstallDisplayName={#MyAppName}
 UninstallDisplayIcon={app}\app.ico
+; ~2.5 ГБ — реальный размер после установки всех pip-зависимостей
+UninstallDisplaySize=2621440
 AppPublisherURL=https://github.com/urtenovcom/whisper-studio
 AppSupportURL=https://github.com/urtenovcom/whisper-studio/issues
 AppUpdatesURL=https://github.com/urtenovcom/whisper-studio/releases
@@ -79,12 +81,13 @@ begin
     CurDisplayedStatus := NewStatus;
     PipProgressPage.SetText('Установка Whisper Studio', NewStatus);
   end;
-  // плавная анимация прогресса небольшими шагами
   if NewPct > CurDisplayedPct then begin
     while CurDisplayedPct < NewPct do begin
       Inc(CurDisplayedPct);
       PipProgressPage.SetProgress(CurDisplayedPct, 100);
-      Sleep(15);
+      // короткий Sleep + Refresh окна — UI остаётся отзывчивым
+      WizardForm.Refresh;
+      Sleep(8);
     end;
   end;
 end;
@@ -149,7 +152,8 @@ begin
       PipProgressPage.SetProgress(Integer(TimePct), 100);
       CurDisplayedPct := Integer(TimePct);
     end;
-    Sleep(200);
+    WizardForm.Refresh;
+    Sleep(50);
   end;
 
   SmoothAnimateTo(100, 'Готово!');
