@@ -96,27 +96,6 @@ python app.py
 
 ---
 
-## Сборка установщика (для мейнтейнера)
-
-```bash
-# 1. Собрать .ico из исходников
-.venv\Scripts\python.exe installer\make_ico.py installer\app.ico
-
-# 2. Скомпилировать через Inno Setup
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" installer\whisper-studio.iss
-
-# Результат: dist-installer\WhisperStudio-Setup.exe
-```
-
-Для нового релиза:
-1. Поднять `APP_VERSION` в `app.py`
-2. Пересобрать установщик
-3. `gh release create vX.Y dist-installer/WhisperStudio-Setup.exe --title "..." --notes "..."`
-
-Через 6 часов у всех пользователей появится кнопка «Обновить».
-
----
-
 ## Лицензия
 
 MIT — см. зависимости (faster-whisper, sherpa-onnx, PySide6) под их собственными лицензиями.
