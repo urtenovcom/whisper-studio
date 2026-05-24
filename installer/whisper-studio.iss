@@ -21,6 +21,10 @@ SolidCompression=yes
 WizardStyle=modern
 SetupIconFile=app.ico
 UninstallDisplayName={#MyAppName}
+UninstallDisplayIcon={app}\app.ico
+AppPublisherURL=https://github.com/urtenovcom/whisper-studio
+AppSupportURL=https://github.com/urtenovcom/whisper-studio/issues
+AppUpdatesURL=https://github.com/urtenovcom/whisper-studio/releases
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 
@@ -63,72 +67,71 @@ function GetTickCount: DWord;
 
 var
   PipProgressPage: TOutputProgressWizardPage;
+  CurDisplayedPct: Integer;
+  TargetPct: Integer;
+  CurDisplayedStatus: string;
 
-function PrettyStatus(const Line: string): string;
+procedure SmoothAnimateTo(NewPct: Integer; const NewStatus: string);
 var
-  s, name: string;
-  p: Integer;
+  i: Integer;
 begin
-  s := Trim(Line);
-  Result := '';
-  if Pos('Collecting ', s) = 1 then begin
-    name := Copy(s, 12, Length(s));
-    p := Pos(' ', name);
-    if p > 0 then name := Copy(name, 1, p - 1);
-    Result := 'Загрузка ' + name + '...';
-  end else if Pos('Downloading ', s) = 1 then begin
-    name := Copy(s, 13, Length(s));
-    p := Pos(' ', name);
-    if p > 0 then name := Copy(name, 1, p - 1);
-    Result := 'Загрузка ' + name + '...';
-  end else if Pos('Installing collected packages', s) = 1 then begin
-    Result := 'Установка пакетов...';
-  end else if Pos('Successfully installed', s) = 1 then begin
-    Result := 'Завершение установки...';
+  if NewStatus <> '' then begin
+    CurDisplayedStatus := NewStatus;
+    PipProgressPage.SetText('Установка Whisper Studio', NewStatus);
+  end;
+  // плавная анимация прогресса небольшими шагами
+  if NewPct > CurDisplayedPct then begin
+    while CurDisplayedPct < NewPct do begin
+      Inc(CurDisplayedPct);
+      PipProgressPage.SetProgress(CurDisplayedPct, 100);
+      Sleep(15);
+    end;
   end;
 end;
 
-procedure ReadStatusLine(const Path: string; var LastShown: string);
+procedure ReadProgressFile(const Path: string);
 var
   Lines: TArrayOfString;
-  i: Integer;
-  candidate: string;
+  s, pctStr, statusStr: string;
+  commaPos, newPct: Integer;
 begin
   if not LoadStringsFromFile(Path, Lines) then Exit;
-  // ищем сверху вниз последнюю строку, из которой можно сделать красивый статус
-  for i := Length(Lines) - 1 downto 0 do begin
-    candidate := PrettyStatus(Lines[i]);
-    if candidate <> '' then begin
-      if candidate <> LastShown then begin
-        LastShown := candidate;
-        PipProgressPage.SetText('Установка Whisper Studio', candidate);
-      end;
-      Exit;
-    end;
+  if GetArrayLength(Lines) = 0 then Exit;
+  s := Trim(Lines[0]);
+  commaPos := Pos('|', s);
+  if commaPos <= 1 then Exit;
+  pctStr := Copy(s, 1, commaPos - 1);
+  statusStr := Copy(s, commaPos + 1, Length(s));
+  newPct := StrToIntDef(pctStr, -1);
+  if newPct < 0 then Exit;
+  if (newPct > TargetPct) or (statusStr <> CurDisplayedStatus) then begin
+    if newPct > TargetPct then TargetPct := newPct;
+    SmoothAnimateTo(TargetPct, statusStr);
   end;
 end;
 
 function RunPipInstall(): Boolean;
 var
-  AppDir, StatusLog, DoneFlag, Cmd: string;
+  AppDir, ProgressFile, DoneFlag, Cmd: string;
   ResultCode: Integer;
-  StartTick, Elapsed, EstimatedMs, Pct: Cardinal;
-  LastStatus: string;
+  StartTick, Elapsed, TimePct: Cardinal;
 begin
   AppDir := ExpandConstant('{app}');
-  StatusLog := AppDir + '\setup.log';
+  ProgressFile := AppDir + '\setup.progress';
   DoneFlag := AppDir + '\setup.done';
-  DeleteFile(StatusLog);
+  DeleteFile(ProgressFile);
   DeleteFile(DoneFlag);
 
   PipProgressPage := CreateOutputProgressPage('Установка Whisper Studio',
     'Загружаем библиотеки с PyPI. Это разовая операция, занимает 5–10 минут.');
-  PipProgressPage.SetText('Подготовка...', '');
+  CurDisplayedPct := 0;
+  TargetPct := 0;
+  CurDisplayedStatus := '';
+  PipProgressPage.SetText('Установка Whisper Studio', 'Подготовка...');
   PipProgressPage.SetProgress(0, 100);
   PipProgressPage.Show;
 
-  // Запускаем bat скрыто и асинхронно, перенаправляем вывод в файл
-  Cmd := '/C ""' + AppDir + '\setup_deps.bat" > "' + StatusLog + '" 2>&1 & echo done > "' + DoneFlag + '""';
+  Cmd := '/C ""' + AppDir + '\setup_deps.bat""';
   if not ShellExec('open', 'cmd.exe', Cmd, AppDir, SW_HIDE, ewNoWait, ResultCode) then begin
     PipProgressPage.Hide;
     Result := False;
@@ -136,24 +139,24 @@ begin
   end;
 
   StartTick := GetTickCount;
-  EstimatedMs := 7 * 60 * 1000; // ~7 минут на типичной скорости
-  LastStatus := '';
-
   while not FileExists(DoneFlag) do begin
+    ReadProgressFile(ProgressFile);
+    // во время длинных этапов плавно ползём по времени между маркерами
     Elapsed := GetTickCount - StartTick;
-    Pct := (Elapsed * 95) div EstimatedMs;
-    if Pct > 95 then Pct := 95;
-    PipProgressPage.SetProgress(Pct, 100);
-    ReadStatusLine(StatusLog, LastStatus);
-    Sleep(400);
+    TimePct := (Elapsed * 90) div (7 * 60 * 1000);
+    if TimePct > 90 then TimePct := 90;
+    if (Integer(TimePct) > CurDisplayedPct) and (Integer(TimePct) < TargetPct + 2) then begin
+      PipProgressPage.SetProgress(Integer(TimePct), 100);
+      CurDisplayedPct := Integer(TimePct);
+    end;
+    Sleep(200);
   end;
 
-  PipProgressPage.SetProgress(100, 100);
-  PipProgressPage.SetText('Готово', 'Whisper Studio установлен.');
-  Sleep(600);
+  SmoothAnimateTo(100, 'Готово!');
+  Sleep(400);
   PipProgressPage.Hide;
   DeleteFile(DoneFlag);
-  DeleteFile(StatusLog);
+  DeleteFile(ProgressFile);
   Result := True;
 end;
 

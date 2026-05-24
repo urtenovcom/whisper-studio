@@ -1371,10 +1371,10 @@ async function startUpdate(){
   if(!ok) return;
   // Заменяем содержимое окна на «Идёт обновление…»
   document.body.innerHTML = `
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;background:var(--bg);color:var(--text);text-align:center;padding:40px">
-      <svg style="width:48px;height:48px;color:var(--accent);margin-bottom:16px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
-      <h2 style="margin:0 0 8px;font-size:20px">Идёт обновление…</h2>
-      <p style="color:var(--muted);max-width:380px;line-height:1.5">Программа автоматически перезапустится, как только установка завершится. Это занимает 1–2 минуты.</p>
+    <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:var(--bg);color:var(--text);text-align:center;padding:40px;z-index:9999">
+      <svg style="width:54px;height:54px;color:var(--accent);margin-bottom:18px" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+      <h2 style="margin:0 0 10px;font-size:22px;font-weight:600">Идёт обновление…</h2>
+      <p style="color:var(--muted);max-width:420px;line-height:1.55;margin:0">Программа автоматически перезапустится, как только установка завершится. Это занимает 1–2 минуты.</p>
     </div>`;
   try{
     await fetch('/api/update/install',{
