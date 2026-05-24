@@ -84,7 +84,7 @@ PORT = 8756
 DEFAULT_MODEL = "medium"          # small | medium | large-v3
 AVAILABLE_MODELS = ["small", "medium", "large-v3"]
 APP_VERSION = "1.0"
-GITHUB_REPO = "alazarstudio/whisper-studio"  # поменяйте на свой репозиторий
+GITHUB_REPO = "urtenovcom/whisper-studio"
 
 app = FastAPI(title="Whisper Studio")
 
