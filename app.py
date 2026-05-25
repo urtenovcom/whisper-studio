@@ -101,7 +101,7 @@ HOST = "127.0.0.1"
 PORT = 8756
 DEFAULT_MODEL = "medium"          # small | medium | large-v3
 AVAILABLE_MODELS = ["small", "medium", "large-v3"]
-APP_VERSION = "1.5"
+APP_VERSION = "1.6"
 GITHUB_REPO = "urtenovcom/whisper-studio"
 
 app = FastAPI(title="Whisper Studio")
