@@ -101,7 +101,8 @@
   .rec-table tbody tr:last-child td{border-bottom:none}
   .rec-table tbody tr{cursor:pointer;transition:background .12s}
   .rec-table tbody tr:hover td{background:var(--row)}
-  .rec-table .name-cell{display:flex;align-items:center;gap:10px}
+  .rec-table{table-layout:fixed;word-wrap:break-word}
+  .rec-table .name-cell{display:flex;align-items:center;gap:10px;overflow-wrap:anywhere;word-break:break-word;min-width:0}
   .rec-table .name-cell .file-ico{flex-shrink:0;color:var(--accent);width:26px;height:26px;border-radius:7px;background:var(--accent-soft);display:inline-flex;align-items:center;justify-content:center}
   .badges{display:flex;gap:5px;flex-wrap:wrap}
   .badge{display:inline-flex;align-items:center;padding:3px 9px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-size:12px;font-weight:500;white-space:nowrap}
@@ -434,11 +435,11 @@
     <table class="rec-table">
       <thead>
         <tr>
-          <th style="width:34%">Название файла</th>
-          <th>Участники</th>
-          <th>Создано</th>
-          <th>Статус</th>
-          <th>Длительность</th>
+          <th style="width:38%">Название файла</th>
+          <th style="width:18%">Участники</th>
+          <th style="width:14%">Создано</th>
+          <th style="width:13%">Статус</th>
+          <th style="width:13%">Длительность</th>
           <th style="width:50px"></th>
         </tr>
       </thead>
@@ -497,6 +498,13 @@
     <div class="sub">Параметры по умолчанию для новых транскрипций.</div>
     <div class="panel">
       <div class="row-between" style="margin-bottom:16px">
+        <div><b>Язык интерфейса</b><div class="meta">Interface language</div></div>
+        <div class="seg-toggle" id="langSeg">
+          <button data-val="ru">Русский</button>
+          <button data-val="en">English</button>
+        </div>
+      </div>
+      <div class="row-between" style="margin-bottom:16px">
         <div><b>Тема оформления</b><div class="meta">Светлая, тёмная или как в системе</div></div>
         <div class="seg-toggle" id="themeSeg">
           <button data-val="light">Светлая</button>
@@ -535,6 +543,10 @@
       <div class="row-between" style="margin-bottom:16px">
         <div><b>Клавиша / комбинация</b><div class="meta" id="dictHotkey">—</div></div>
         <button class="btn ghost sm" onclick="captureHotkey()">Изменить</button>
+      </div>
+      <div class="row-between" style="margin-bottom:16px">
+        <div><b>Звуки диктовки</b><div class="meta">Сигнал начала и конца записи</div></div>
+        <div class="switch" id="dictSounds" onclick="toggleDictSounds()"></div>
       </div>
       <div class="row-between" style="margin-bottom:16px" id="dictHoldRow">
         <div><b>Задержка до старта</b><div class="meta">Только для одиночной клавиши — чтобы случайно не сработало</div></div>
@@ -604,18 +616,131 @@ const MODEL_HINTS = {
 
 // ---------------------------------------------------------------- helpers
 const $ = s => document.querySelector(s);
-function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');
+
+// ---------------------------------------------------------------- i18n
+const I18N_EN = {
+  // Sidebar
+  'Новая транскрипция':'New transcription','Все записи':'All recordings','Проекты':'Projects',
+  'Без проекта':'No project','Создать проект':'Create project','Настройки':'Settings',
+  'Обновить':'Update','Powered by':'Powered by',
+  // New page
+  'Загрузите аудио или видео — распознавание идёт на вашем компьютере.':'Upload audio or video — recognition runs on your computer.',
+  'Перетащите файлы или нажмите для выбора':'Drag files or click to choose',
+  'MP3, WAV, M4A, AAC, MP4, MOV, WEBM и другие форматы':'MP3, WAV, M4A, AAC, MP4, MOV, WEBM and others',
+  'Модель':'Model','Язык':'Language','Автоопределение':'Auto-detect',
+  'Русский':'Russian','Английский':'English','Казахский':'Kazakh','Украинский':'Ukrainian',
+  'Определять говорящих':'Detect speakers','Сколько говорящих':'How many speakers',
+  'Авто':'Auto','Очистить':'Clear','Транскрибировать':'Transcribe',
+  // Recordings table
+  'Поиск транскрипций…':'Search transcriptions…','Название файла':'File name',
+  'Участники':'Participants','Создано':'Created','Статус':'Status',
+  'Длительность':'Duration','Завершено':'Done',
+  'Пока нет ни одной транскрипции':'No transcriptions yet',
+  'Ничего не найдено':'Nothing found','Нет закладок':'No bookmarks',
+  // Transcript
+  'Назад':'Back','Экспорт':'Export','Копировать':'Copy','Удалить':'Delete',
+  'Найдены говорящие':'Detected speakers','Время':'Time','Спикеры':'Speakers',
+  'Только закладки':'Bookmarks only','Поиск по тексту…':'Search text…',
+  'Текст (.txt)':'Text (.txt)','Word (.docx)':'Word (.docx)',
+  'Субтитры (.srt)':'Subtitles (.srt)','Субтитры (.vtt)':'Subtitles (.vtt)',
+  'Переименовать':'Rename','Переместить в':'Move to','Новый проект…':'New project…',
+  'Переименовать спикера':'Rename speaker','Назначить другому':'Reassign',
+  'Назначить реплику':'Reassign line','Выбрать существующего':'Pick existing',
+  'Или создать нового':'Or create new','Имя нового спикера':'New speaker name',
+  'Например, Интервьюер':'e.g., Interviewer',
+  // Settings
+  'Параметры по умолчанию для новых транскрипций.':'Defaults for new transcriptions.',
+  'Тема оформления':'Theme','Светлая, тёмная или как в системе':'Light, dark or system',
+  'Светлая':'Light','Тёмная':'Dark','Системная':'System',
+  'Счётчики в проектах':'Project counters',
+  'Показывать число записей рядом с проектом':'Show recording counts next to each project',
+  'Запускать при старте Windows':'Run at Windows startup',
+  'Программа будет автоматически открываться в трее':'The app will start in the system tray',
+  'Устройство вычислений':'Compute device',
+  'Распознавание говорящих':'Speaker recognition',
+  'Язык интерфейса':'Interface language',
+  'Диктовка':'Dictation',
+  'Зажмите клавишу — программа запишет с микрофона и вставит распознанный текст в активное окно.':'Hold a key — the app records from microphone and pastes the recognised text into the active window.',
+  'Включить':'Enable','Клавиша / комбинация':'Hotkey','Изменить':'Change',
+  'Задержка до старта':'Delay before start',
+  'Только для одиночной клавиши — чтобы случайно не сработало':'Only for single key — to prevent accidental triggers',
+  'Без задержки':'No delay','1 секунда':'1 second','0.5 сек':'0.5 sec',
+  '1.5 сек':'1.5 sec','2 секунды':'2 seconds',
+  'Чем меньше — тем быстрее':'Smaller = faster',
+  'small (быстро)':'small (fast)','large-v3 (точнее)':'large-v3 (accurate)',
+  'Язык, на котором вы будете диктовать':'The language you will dictate in',
+  'Микрофон':'Microphone','Источник аудио':'Audio source',
+  'Системный по умолчанию':'System default',
+  'Звуки диктовки':'Dictation sounds',
+  'Сигнал начала и конца записи':'Beep at start and end of recording',
+  'Модели Whisper при первом использовании скачиваются автоматически (нужен интернет один раз). Далее всё работает офлайн. Чем крупнее модель — тем точнее русский, но тем больше нужно памяти и времени.':
+    'Whisper models are downloaded automatically on first use (internet needed once). After that everything works offline. Larger models are more accurate but use more memory and time.',
+  // Status / pills
+  'Загрузка':'Uploading','В очереди':'Queued','Модель':'Model',
+  'Распознавание':'Transcribing','Говорящие':'Diarization','Готово':'Done',
+  'Ошибка':'Error','Отменено':'Cancelled','Отменяю…':'Cancelling…',
+  'Открыть':'Open','Сохранить':'Save','Создать':'Create','Отмена':'Cancel',
+  // Modals / Toasts
+  'Сохранено':'Saved','Сохранено':'Saved','Удалить запись?':'Delete recording?',
+  'Создать проект':'Create project','Переименовать запись':'Rename recording',
+  'Переименовать проект':'Rename project','Удалить проект?':'Delete project?',
+  'Новое название':'New name','Название проекта':'Project name',
+  // Update / footer
+  'Идёт обновление…':'Updating…',
+  'Программа автоматически перезапустится, как только установка завершится. Это занимает 1–2 минуты.':
+    'The app will restart automatically once the installation finishes. This takes 1–2 minutes.',
+  'Обновить Whisper Studio?':'Update Whisper Studio?',
+  // Hotkey modal
+  'Назначить горячую клавишу':'Set hotkey',
+  'Нажмите клавишу или комбинацию, затем отпустите все клавиши и нажмите «Сохранить».':
+    'Press a key or combination, then release all keys and click «Save».',
+  'Ожидание нажатия…':'Waiting for input…',
+  'Подсказка: для одиночной клавиши (например, Правый Ctrl) включится задержка перед стартом, чтобы случайно не сработало.':
+    'Tip: for a single key (e.g. Right Ctrl) a hold delay applies to avoid accidental triggers.',
+};
+let UI_LANG = localStorage.getItem('uiLang') || 'ru';
+function tr(s){
+  if(UI_LANG === 'ru' || s == null) return s;
+  return I18N_EN[s] || s;
+}
+function applyI18nDom(){
+  if(UI_LANG === 'ru') return;
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, null);
+  let n;
+  const toUpdate = [];
+  while(n = walker.nextNode()){
+    const v = n.nodeValue;
+    if(!v) continue;
+    const trimmed = v.trim();
+    if(trimmed && I18N_EN[trimmed]){
+      toUpdate.push([n, v.replace(trimmed, I18N_EN[trimmed])]);
+    }
+  }
+  toUpdate.forEach(([n,v]) => n.nodeValue = v);
+  document.querySelectorAll('[placeholder]').forEach(el=>{
+    if(I18N_EN[el.placeholder]) el.placeholder = I18N_EN[el.placeholder];
+  });
+  document.querySelectorAll('[title]').forEach(el=>{
+    if(I18N_EN[el.title]) el.title = I18N_EN[el.title];
+  });
+}
+function setUiLang(lang){
+  localStorage.setItem('uiLang', lang);
+  location.reload();
+}
+
+function toast(m){const t=$('#toast');t.textContent=tr(m);t.classList.add('show');
   setTimeout(()=>t.classList.remove('show'),2600);}
 
 let _modalResolve=null;
 function openModal({title,body,okText='OK',okClass='primary',cancelText='Отмена',focus=null}){
   return new Promise(resolve=>{
     _modalResolve = resolve;
-    $('#modalTitle').textContent = title;
+    $('#modalTitle').textContent = tr(title);
     $('#modalBody').innerHTML = body;
-    $('#modalOk').textContent = okText;
+    $('#modalOk').textContent = tr(okText);
     $('#modalOk').className = 'btn '+okClass+' sm';
-    $('#modalCancel').textContent = cancelText;
+    $('#modalCancel').textContent = tr(cancelText);
     $('#modalBackdrop').classList.add('show');
     if(focus){
       setTimeout(()=>{
@@ -644,7 +769,7 @@ document.addEventListener('keydown',e=>{
   }
 });
 function promptModal(title,{label='Название',value='',placeholder='',okText='Сохранить'}={}){
-  const body = `${label?`<label>${label}</label>`:''}<input type="text" id="modalInput" value="${escapeAttr(value)}" placeholder="${escapeAttr(placeholder)}">`;
+  const body = `${label?`<label>${tr(label)}</label>`:''}<input type="text" id="modalInput" value="${escapeAttr(value)}" placeholder="${escapeAttr(tr(placeholder))}">`;
   return openModal({title,body,okText,focus:'modalInput'});
 }
 function confirmDialog(title,message,{okText='Удалить',okClass='danger'}={}){
@@ -698,6 +823,7 @@ async function init(){
   applyThemeMode(localStorage.getItem('theme') || 'system');
   setProjectCount(localStorage.getItem('showCounts') !== '0');
   $('#recSearch').oninput = renderRecordings;
+  applyI18nDom();
   await loadRecordings();
 }
 function updateHint(){ $('#modelHint').textContent = MODEL_HINTS[$('#modelSel').value]||''; }
@@ -825,7 +951,7 @@ function renderQueue(){
     const running=['uploading','queued','loading','transcribing','diarizing'].includes(it.status);
     let right='';
     if(it.status==='done')
-      right=`<button class="btn primary sm" data-act="open">Открыть</button>`;
+      right=`<button class="btn primary sm" data-act="open">${tr('Открыть')}</button>`;
     else if(it.status==='error'||it.status==='cancelled')
       right=`<button class="btn ghost sm" data-act="remove"><svg class="i sm"><use href="#i-x"/></svg></button>`;
     else if(it.status==='cancelling')
@@ -836,9 +962,9 @@ function renderQueue(){
     const pillClass = it.status==='done' ? 'ok'
       : (it.status==='error'||it.status==='cancelled') ? 'err' : 'run';
     div.innerHTML=`
-      <span class="pill ${pillClass}">${ST_LABEL[it.status]||it.status}</span>
+      <span class="pill ${pillClass}">${tr(ST_LABEL[it.status]||it.status)}</span>
       <div class="name">${escapeHtml(it.name)}</div>
-      ${running?`<span class="meta">${it.message||''}</span>`:''}
+      ${running?`<span class="meta">${tr(it.message||'')}</span>`:''}
       <div class="act" style="display:flex;align-items:center"></div>`;
     div.querySelector('.act').innerHTML=right;
     const actBtn=div.querySelector('[data-act]');
@@ -1407,6 +1533,15 @@ _themeMql.addEventListener('change', ()=>{
 document.querySelectorAll('#themeSeg button').forEach(b=>{
   b.onclick=()=>setTheme(b.dataset.val);
 });
+document.querySelectorAll('#langSeg button').forEach(b=>{
+  b.classList.toggle('active', b.dataset.val===UI_LANG);
+  b.onclick=()=>setUiLang(b.dataset.val);
+});
+function toggleDictSounds(){
+  const cur = $('#dictSounds').classList.contains('on');
+  updateDictSetting('sounds', !cur);
+  $('#dictSounds').classList.toggle('on', !cur);
+}
 
 function setProjectCount(on){
   document.body.classList.toggle('no-counts', !on);
@@ -1461,6 +1596,7 @@ async function loadDictation(){
   $('#dictModel').value = r.settings.model||'small';
   $('#dictLang').value = r.settings.language||'ru';
   $('#dictHoldRow').style.display = (r.settings.hotkey||[]).length===1 ? '' : 'none';
+  $('#dictSounds').classList.toggle('on', r.settings.sounds !== false);
   if(!r.available){
     $('#dictStatusText').textContent = 'Недоступно (нет библиотек)';
     $('#dictEnabled').style.opacity = .4;

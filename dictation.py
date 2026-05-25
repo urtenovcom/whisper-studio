@@ -43,6 +43,8 @@ def _play_sound(path):
     """Короткий звук, асинхронно (Windows). Не блокирует."""
     if sys.platform != "win32" or not path.exists():
         return
+    if not (_state.get("settings") or {}).get("sounds", True):
+        return
     try:
         import winsound
         winsound.PlaySound(
@@ -92,6 +94,7 @@ DEFAULT_SETTINGS = {
     "model": "small",
     "language": "ru",
     "device_index": None,
+    "sounds": True,
 }
 
 
@@ -321,6 +324,7 @@ def _audio_callback(indata, frames, time_info, status):
 def _stop_and_transcribe():
     _state["stop_recording"].set()
     _state["status"] = DictationState.TRANSCRIBING
+    _play_sound(_SOUND_OFF)
     _overlay_safe("set_mode", "transcribing")
     t = threading.Thread(target=_do_transcribe, daemon=True)
     t.start()

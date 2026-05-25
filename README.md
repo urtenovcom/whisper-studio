@@ -1,5 +1,111 @@
 # Whisper Studio
 
+Local audio transcription powered by **faster-whisper**.
+Modern desktop interface, everything runs on your computer: no subscription,
+no limits, no audio sent to third-party servers.
+
+*Powered by Alazar Studio.*
+
+---
+
+## Installation
+
+1. Download **`WhisperStudio-Setup.exe`** from the latest release:
+   👉 [github.com/urtenovcom/whisper-studio/releases/latest](https://github.com/urtenovcom/whisper-studio/releases/latest)
+2. Run the installer — Windows UAC confirmation required.
+3. Setup takes 5–10 minutes (dependencies download from the internet once).
+4. The app starts automatically when done. Shortcut goes to Desktop and Start menu.
+
+> Windows 10/11 (x64) supported. macOS / Linux not in the installer yet, but
+> the code is cross-platform — run manually (see below).
+
+---
+
+## Features
+
+### Transcription
+- Drag-and-drop audio/video upload
+- Models: `small`, `medium`, `large-v3` (for Russian — `medium` or `large-v3`)
+- Automatic **NVIDIA GPU** use (CUDA 12 / cuDNN 9 bundled with the installer)
+- Batch processing with per-job cancel
+- Player with timestamps, click on time to seek
+- Inline editing (Enter — save, Esc — revert)
+- Bookmarks on important lines
+- Full-text search inside a transcript
+- Export to **TXT, DOCX, SRT, VTT**
+
+### Speaker recognition
+- Works out of the box — **no HuggingFace account or tokens required**
+- Optionally specify the exact number of speakers for much better quality
+- Rename a speaker (Speaker 1 → Name) once — applied to all their lines
+- Speaker chips above the transcript can be temporarily hidden
+
+### Push-to-talk dictation
+- Hold Right Ctrl (or any key/combo) — speak — release — text appears in active window
+- Works anywhere (messengers, documents, browser)
+- Start-of-recording chime, floating equalizer pill on top of all windows
+- Configurable: hotkey, delay, model, language, microphone
+
+### Storage
+- **Projects (folders)** to group recordings, move between projects
+- Search across all transcriptions
+- All data stays local in `%APPDATA%\Whisper Studio\`
+
+### Interface
+- Light / dark / system theme
+- Russian / English UI
+- Minimizes to system tray on close (keeps running)
+- Start with Windows (optional, in Settings)
+- In-app auto-update via GitHub Releases
+
+---
+
+## Manual run (for developers)
+
+To run from source or modify the code:
+
+```bash
+# Python 3.12 recommended (PyTorch CUDA wheels for 3.14 are not out yet)
+python -m venv .venv
+.venv\Scripts\activate         # Windows
+# source .venv/bin/activate    # macOS/Linux
+
+pip install -r requirements.txt
+pip install PySide6 pynput sounddevice pyperclip requests
+pip install nvidia-cublas-cu12 nvidia-cudnn-cu12  # NVIDIA GPU only
+
+python app.py
+```
+
+The app opens its own window (Qt WebEngine) and starts a local server at
+`http://127.0.0.1:8756`.
+
+---
+
+## Data layout
+
+| Folder | Contents |
+|---|---|
+| `%APPDATA%\Whisper Studio\recordings\` | transcriptions (JSON) |
+| `%APPDATA%\Whisper Studio\uploads\` | original audio files |
+| `%APPDATA%\Whisper Studio\projects.json` | project list |
+| `%APPDATA%\Whisper Studio\dictation.json` | dictation settings |
+| `C:\Program Files\Whisper Studio\data\models\diarize\` | speaker diarization models |
+| `%USERPROFILE%\.cache\huggingface\` | Whisper model cache |
+
+To move data to another computer — copy `%APPDATA%\Whisper Studio\`.
+
+---
+
+## License
+
+MIT — see dependencies (faster-whisper, sherpa-onnx, PySide6) under their own licenses.
+
+---
+---
+
+# Whisper Studio (Русский)
+
 Локальная программа для транскрипции аудио на базе **faster-whisper**.
 Современный десктоп-интерфейс, всё работает на вашем компьютере: без подписки,
 без лимитов, без отправки аудио на чужой сервер.
@@ -8,7 +114,7 @@
 
 ---
 
-## Установка (для пользователей)
+## Установка
 
 1. Скачайте **`WhisperStudio-Setup.exe`** из последнего релиза:
    👉 [github.com/urtenovcom/whisper-studio/releases/latest](https://github.com/urtenovcom/whisper-studio/releases/latest)
@@ -21,7 +127,7 @@
 
 ---
 
-## Что умеет
+## Возможности
 
 ### Транскрипция
 - Загрузка аудио/видео перетаскиванием
@@ -53,9 +159,10 @@
 
 ### Интерфейс
 - Светлая / тёмная / системная тема
+- Русский / английский язык интерфейса
 - Сворачивание в трей при закрытии (продолжает работать)
 - Авто-запуск при старте Windows (опционально, в Настройках)
-- Авто-обновление через GitHub Releases (без скачивания вручную)
+- Авто-обновление через GitHub Releases
 
 ---
 
