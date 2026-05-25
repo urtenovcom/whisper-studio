@@ -1,12 +1,17 @@
 """Главное окно (Qt WebEngine) + системная трей-иконка."""
 
+import os
+import subprocess
 import sys
-from PySide6.QtCore import Qt, QUrl
+from pathlib import Path
+
+from PySide6.QtCore import Qt, QUrl, QStandardPaths
 from PySide6.QtGui import QIcon, QAction, QPixmap, QPainter, QColor, QPen
 from PySide6.QtWidgets import (
     QMainWindow, QSystemTrayIcon, QMenu, QApplication,
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWebEngineCore import QWebEngineProfile, QWebEngineDownloadRequest
 
 
 def make_app_icon(size: int = 64) -> QIcon:
@@ -49,10 +54,44 @@ class MainWindow(QMainWindow):
         self.setMinimumSize(1280, 720)
         self.setWindowIcon(make_app_icon(64))
         self.web = QWebEngineView(self)
+        # Подключаем обработчик загрузок — экспорт файлов уходит в Загрузки
+        profile = self.web.page().profile()
+        profile.downloadRequested.connect(self._on_download_requested)
         self.web.load(QUrl(url))
         self.setCentralWidget(self.web)
         self._force_quit = False
         self._tray_ref = tray_ref
+
+    def _on_download_requested(self, download: QWebEngineDownloadRequest):
+        from PySide6.QtWidgets import QFileDialog
+        downloads_dir = QStandardPaths.writableLocation(QStandardPaths.DownloadLocation)
+        if not downloads_dir:
+            downloads_dir = str(Path.home() / "Downloads")
+        name = download.suggestedFileName() or "whisper-export"
+        default_path = str(Path(downloads_dir) / name)
+        # Подсказываем фильтр по расширению
+        ext = Path(name).suffix.lower().lstrip(".")
+        filt = "Все файлы (*.*)"
+        if ext:
+            filt = f"Файл *.{ext} (*.{ext});;Все файлы (*.*)"
+        target, _ = QFileDialog.getSaveFileName(
+            self, "Сохранить как", default_path, filt
+        )
+        if not target:
+            download.cancel()
+            return
+        target_path = Path(target)
+        download.setDownloadDirectory(str(target_path.parent))
+        download.setDownloadFileName(target_path.name)
+        download.accept()
+        def _finished():
+            if download.state() == QWebEngineDownloadRequest.DownloadCompleted:
+                try:
+                    if sys.platform == "win32":
+                        subprocess.Popen(["explorer", "/select,", str(target_path)])
+                except Exception:
+                    pass
+        download.isFinishedChanged.connect(_finished)
 
     def closeEvent(self, event):
         if self._force_quit:

@@ -523,8 +523,28 @@
       <div class="row-between" style="margin-bottom:16px">
         <div><b>Устройство вычислений</b><div class="meta" id="setDevice">—</div></div>
       </div>
-      <div class="row-between">
+      <div class="row-between" style="margin-bottom:16px">
         <div><b>Распознавание говорящих</b><div class="meta" id="setDiar">—</div></div>
+      </div>
+      <div class="row-between" style="margin-bottom:16px;align-items:flex-start">
+        <div style="flex:1;min-width:0">
+          <b>Папка с оригиналами аудио</b>
+          <div class="meta path-display" id="pathUploads" style="overflow-wrap:anywhere;margin-top:4px">—</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn ghost sm" onclick="openPath('uploads')"><svg class="i sm"><use href="#i-folder"/></svg> Открыть</button>
+          <button class="btn ghost sm" onclick="pickPath('uploads')">Изменить</button>
+        </div>
+      </div>
+      <div class="row-between" style="align-items:flex-start">
+        <div style="flex:1;min-width:0">
+          <b>Папка с расшифровками</b>
+          <div class="meta path-display" id="pathRecordings" style="overflow-wrap:anywhere;margin-top:4px">—</div>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn ghost sm" onclick="openPath('recordings')"><svg class="i sm"><use href="#i-folder"/></svg> Открыть</button>
+          <button class="btn ghost sm" onclick="pickPath('recordings')">Изменить</button>
+        </div>
       </div>
     </div>
     <div class="hint">
@@ -788,7 +808,7 @@ function show(v){
     e.classList.toggle('active', isActive);
   });
   if(v==='recordings') loadRecordings();
-  if(v==='settings'){ loadDictation(); refreshAutostart(); }
+  if(v==='settings'){ loadDictation(); refreshAutostart(); refreshPaths(); }
 }
 document.querySelectorAll('.nav-item[data-view]').forEach(n=>{
   if(n.dataset.filter==='all'){
@@ -1470,9 +1490,31 @@ function toggleDd(){ $('#exportDd').classList.toggle('open'); }
 document.addEventListener('click',e=>{
   if(!e.target.closest('#exportDd')) $('#exportDd').classList.remove('open');
 });
-function doExport(fmt){
+async function doExport(fmt){
   $('#exportDd').classList.remove('open');
-  window.open('/api/recordings/'+currentRec.id+'/export?format='+fmt,'_blank');
+  if(!currentRec) return;
+  try{
+    const r = await fetch('/api/recordings/'+currentRec.id+'/export?format='+fmt);
+    if(!r.ok){ toast('Ошибка экспорта'); return; }
+    const blob = await r.blob();
+    // Имя файла из Content-Disposition
+    const cd = r.headers.get('Content-Disposition') || '';
+    let filename = (currentRec.name || 'export') + '.' + fmt;
+    let m = cd.match(/filename\*=UTF-8''([^;]+)/i);
+    if(m) filename = decodeURIComponent(m[1]);
+    else {
+      m = cd.match(/filename="([^"]+)"/i);
+      if(m) filename = m[1];
+    }
+    const objUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(()=>URL.revokeObjectURL(objUrl), 2000);
+  }catch(e){ toast('Не удалось экспортировать'); }
 }
 
 // ---------------------------------------------------------------- updates
@@ -1557,6 +1599,41 @@ async function refreshAutostart(){
     const r = await fetch('/api/autostart').then(r=>r.json());
     $('#autostartSwitch').classList.toggle('on', !!r.enabled);
   }catch(e){}
+}
+
+async function refreshPaths(){
+  try{
+    const p = await fetch('/api/paths').then(r=>r.json());
+    $('#pathUploads').textContent = p.uploads;
+    $('#pathRecordings').textContent = p.recordings;
+  }catch(e){}
+}
+
+async function openPath(kind){
+  try{
+    await fetch('/api/paths/open',{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({kind})
+    });
+  }catch(e){ toast('Не удалось открыть папку'); }
+}
+
+async function pickPath(kind){
+  toast('Откроется диалог выбора папки…');
+  try{
+    const r = await fetch('/api/paths/pick',{method:'POST'}).then(r=>r.json());
+    if(!r.path) return;
+    await fetch('/api/paths',{
+      method:'PUT', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({[kind]: r.path})
+    });
+    await refreshPaths();
+    await confirmDialog(
+      'Папка изменена',
+      'Изменения применятся после перезапуска программы.',
+      {okText:'OK', okClass:'primary'}
+    );
+  }catch(e){ toast('Не удалось изменить'); }
 }
 async function toggleAutostart(){
   const on = $('#autostartSwitch').classList.contains('on');

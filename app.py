@@ -74,8 +74,26 @@ def _resolve_data_dir() -> Path:
 
 
 DATA = _resolve_data_dir()
-UPLOADS = DATA / "uploads"
-RECORDINGS = DATA / "recordings"
+PATHS_FILE = DATA / "paths.json"
+
+
+def _load_paths_config():
+    if PATHS_FILE.exists():
+        try:
+            return json.loads(PATHS_FILE.read_text(encoding="utf-8")) or {}
+        except Exception:
+            return {}
+    return {}
+
+
+def _save_paths_config(cfg: dict):
+    DATA.mkdir(parents=True, exist_ok=True)
+    PATHS_FILE.write_text(json.dumps(cfg, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+_paths_cfg = _load_paths_config()
+UPLOADS = Path(_paths_cfg.get("uploads") or (DATA / "uploads"))
+RECORDINGS = Path(_paths_cfg.get("recordings") or (DATA / "recordings"))
 for _d in (UPLOADS, RECORDINGS):
     _d.mkdir(parents=True, exist_ok=True)
 
@@ -410,6 +428,94 @@ def export_docx(rec):
 @app.get("/api/about")
 def api_about():
     return {"version": APP_VERSION, "repo": GITHUB_REPO}
+
+
+# --------------------------------------------------------------------------
+# Single-instance: показать существующее окно
+# --------------------------------------------------------------------------
+_show_requested = {"flag": False}
+
+
+@app.post("/api/show")
+def api_show_window():
+    _show_requested["flag"] = True
+    return {"ok": True}
+
+
+# --------------------------------------------------------------------------
+# Настраиваемые папки для оригиналов и расшифровок
+# --------------------------------------------------------------------------
+_pick_request = {"pending": False, "result": None}
+
+
+@app.get("/api/paths")
+def api_get_paths():
+    return {
+        "uploads": str(UPLOADS),
+        "recordings": str(RECORDINGS),
+        "default_uploads": str(DATA / "uploads"),
+        "default_recordings": str(DATA / "recordings"),
+    }
+
+
+@app.put("/api/paths")
+async def api_set_paths(payload: dict):
+    cfg = _load_paths_config()
+    changed = False
+    for key in ("uploads", "recordings"):
+        v = (payload or {}).get(key)
+        if v:
+            new_path = Path(v).expanduser().resolve()
+            try:
+                new_path.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                raise HTTPException(400, f"Не удалось создать папку: {e}")
+            cfg[key] = str(new_path)
+            changed = True
+    if changed:
+        _save_paths_config(cfg)
+    return {"ok": True, "restart_required": True}
+
+
+@app.post("/api/paths/pick")
+def api_paths_pick():
+    import time as _t
+    _pick_request["pending"] = True
+    _pick_request["result"] = None
+    # Ждём, пока Qt обработает запрос (макс 60 сек)
+    for _ in range(120):
+        _t.sleep(0.5)
+        if not _pick_request["pending"]:
+            break
+    return {"path": _pick_request["result"]}
+
+
+@app.post("/api/paths/open")
+def api_paths_open(payload: dict):
+    kind = (payload or {}).get("kind")
+    target = None
+    if kind == "uploads":
+        target = UPLOADS
+    elif kind == "recordings":
+        target = RECORDINGS
+    if not target:
+        raise HTTPException(400, "Неизвестный тип папки")
+    try:
+        target.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        pass
+    try:
+        if sys.platform == "win32":
+            os.startfile(str(target))
+        elif sys.platform == "darwin":
+            import subprocess
+            subprocess.Popen(["open", str(target)])
+        else:
+            import subprocess
+            subprocess.Popen(["xdg-open", str(target)])
+    except Exception as e:
+        raise HTTPException(500, str(e))
+    return {"ok": True}
 
 
 # --------------------------------------------------------------------------
@@ -855,6 +961,24 @@ app.mount("/static", StaticFiles(directory=BASE / "static"), name="static")
 if __name__ == "__main__":
     import uvicorn
 
+    # ---- Single-instance: если порт уже занят — пробуем достучаться до старого окна
+    import socket as _sock
+    try:
+        _t = _sock.create_connection((HOST, PORT), timeout=1.0)
+        _t.close()
+        # порт уже слушают — это наш предыдущий экземпляр
+        try:
+            import urllib.request
+            req = urllib.request.Request(
+                f"http://{HOST}:{PORT}/api/show", method="POST"
+            )
+            urllib.request.urlopen(req, timeout=2)
+        except Exception:
+            pass
+        sys.exit(0)
+    except (ConnectionRefusedError, OSError):
+        pass
+
     print("=" * 56)
     print("  Whisper Studio")
     print(f"  Устройство: {DEVICE} ({COMPUTE_TYPE})")
@@ -898,7 +1022,6 @@ if __name__ == "__main__":
                 main_window = MainWindow(f"http://{HOST}:{PORT}/")
                 tray = setup_tray(qt_app, main_window)
                 if start_minimized:
-                    # При автозапуске прячем — пользователь увидит только иконку в трее
                     main_window.hide()
                 else:
                     main_window.show()
@@ -910,6 +1033,27 @@ if __name__ == "__main__":
                         main_window.raise_(),
                         main_window.activateWindow(),
                     ))
+
+                # Опросный таймер: реагируем на «показать окно» и «открыть picker»
+                from PySide6.QtCore import QTimer
+                from PySide6.QtWidgets import QFileDialog
+
+                def _poll():
+                    if _show_requested["flag"]:
+                        _show_requested["flag"] = False
+                        main_window.showNormal()
+                        main_window.raise_()
+                        main_window.activateWindow()
+                    if _pick_request["pending"] and _pick_request["result"] is None:
+                        d = QFileDialog.getExistingDirectory(
+                            main_window, "Выберите папку"
+                        )
+                        _pick_request["result"] = d or ""
+                        _pick_request["pending"] = False
+
+                t = QTimer(qt_app)
+                t.timeout.connect(_poll)
+                t.start(250)
 
             QTimer.singleShot(800, _launch_window)
         except Exception as e:
